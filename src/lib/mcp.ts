@@ -1,5 +1,7 @@
 import { createParser } from "eventsource-parser"
 
+import { getValidToken, type McpOAuth } from "@/lib/mcp-oauth"
+
 // Minimal MCP client over the Streamable HTTP transport (JSON-RPC 2.0 via POST;
 // responses arrive as plain JSON or as an SSE stream). Browser-direct, so the
 // server must allow CORS. Tokens stay in localStorage like every other key.
@@ -9,7 +11,18 @@ export interface McpServerConfig {
   name: string
   url: string
   authToken?: string
+  oauth?: McpOAuth
   enabled: boolean
+}
+
+/** The server answered 401: an interactive OAuth flow (user gesture) is needed. */
+export class McpAuthRequiredError extends Error {
+  constructor(
+    public server: McpServerConfig,
+    public wwwAuthenticate: string | null
+  ) {
+    super(`"${server.name}" requires authorization`)
+  }
 }
 
 export interface McpTool {
@@ -30,12 +43,14 @@ class McpConnection {
 
   constructor(private cfg: McpServerConfig) {}
 
-  private headers(): Record<string, string> {
+  private async headers(): Promise<Record<string, string>> {
+    // Static token wins; otherwise use (and silently refresh) the OAuth token.
+    const bearer = this.cfg.authToken || (await getValidToken(this.cfg.id))
     return {
       "content-type": "application/json",
       accept: "application/json, text/event-stream",
       ...(this.sessionId && { "mcp-session-id": this.sessionId }),
-      ...(this.cfg.authToken && { authorization: `Bearer ${this.cfg.authToken}` }),
+      ...(bearer && { authorization: `Bearer ${bearer}` }),
     }
   }
 
@@ -44,7 +59,7 @@ class McpConnection {
     try {
       res = await fetch(this.cfg.url, {
         method: "POST",
-        headers: this.headers(),
+        headers: await this.headers(),
         body: JSON.stringify(body),
         signal,
       })
@@ -53,6 +68,9 @@ class McpConnection {
       throw new Error(
         `Could not reach MCP server "${this.cfg.name}" — check the URL and that it allows browser (CORS) access.`
       )
+    }
+    if (res.status === 401) {
+      throw new McpAuthRequiredError(this.cfg, res.headers.get("www-authenticate"))
     }
     this.sessionId = res.headers.get("mcp-session-id") ?? this.sessionId
     return res
@@ -133,7 +151,7 @@ class McpConnection {
 const connections = new Map<string, Promise<{ conn: McpConnection; tools: McpTool[] }>>()
 
 function cacheKey(cfg: McpServerConfig): string {
-  return `${cfg.id}:${cfg.url}:${cfg.authToken ?? ""}`
+  return `${cfg.id}:${cfg.url}:${cfg.authToken ?? ""}:${cfg.oauth?.tokens?.accessToken ?? ""}`
 }
 
 export function connectMcp(cfg: McpServerConfig): Promise<{ conn: McpConnection; tools: McpTool[] }> {

@@ -1,7 +1,9 @@
 import { useState } from "react"
-import { Check, Pencil, Plus, Trash2 } from "lucide-react"
+import { Check, LogIn, Pencil, Plus, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { useLogout, useMe } from "@/hooks/use-me"
+import { authorizeMcpServer, disconnectMcpServer } from "@/lib/mcp-oauth"
 
 function GithubIcon() {
   return (
@@ -412,7 +414,8 @@ function McpSection() {
       <p className="text-xs text-muted-foreground">
         Tools from these servers are offered to models that support tool
         calling. Servers must speak the Streamable HTTP transport and allow
-        browser (CORS) access. Tokens stay in this browser.
+        browser (CORS) access. Servers that require OAuth get a Connect button;
+        all tokens stay in this browser.
       </p>
 
       {servers.map((s) => (
@@ -421,9 +424,40 @@ function McpSection() {
           className="flex items-center gap-2 rounded-lg border border-border/70 bg-card/40 px-3 py-2"
         >
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-medium">{s.name}</span>
+            <span className="flex items-center gap-1.5 truncate text-sm font-medium">
+              {s.name}
+              {s.oauth?.tokens && (
+                <Badge variant="secondary" className="gap-1 text-xs">
+                  <Check className="size-3" /> authorized
+                </Badge>
+              )}
+            </span>
             <span className="truncate text-xs text-muted-foreground">{s.url}</span>
           </div>
+          {s.oauth?.tokens ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => disconnectMcpServer(s.id)}
+            >
+              Disconnect
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => {
+                toast.promise(authorizeMcpServer(s), {
+                  loading: `Connecting to "${s.name}"…`,
+                  success: `Connected to "${s.name}"`,
+                  error: (e: unknown) => (e instanceof Error ? e.message : String(e)),
+                })
+              }}
+            >
+              <LogIn data-icon="inline-start" />
+              Connect
+            </Button>
+          )}
           <Switch
             checked={s.enabled}
             onCheckedChange={(on) =>

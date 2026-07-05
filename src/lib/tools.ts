@@ -2,9 +2,26 @@ import { toast } from "sonner"
 
 import type { SearchResult } from "@/lib/db"
 import { exaSearch, searchContextBlock } from "@/lib/exa"
-import { connectMcp } from "@/lib/mcp"
+import { connectMcp, McpAuthRequiredError } from "@/lib/mcp"
+import { authorizeMcpServer } from "@/lib/mcp-oauth"
 import type { ToolDef } from "@/lib/openai"
 import { getPrefs } from "@/lib/profiles"
+
+/** Popups need a user gesture, so mid-send auth failures surface as an actionable toast. */
+function toastAuthRequired(err: McpAuthRequiredError) {
+  toast.error(`MCP server "${err.server.name}" needs authorization`, {
+    id: `mcp-auth-${err.server.id}`, // dedupe repeat failures
+    duration: 10_000,
+    action: {
+      label: "Connect",
+      onClick: () => {
+        void authorizeMcpServer(err.server, err.wwwAuthenticate)
+          .then(() => toast.success(`Connected to "${err.server.name}" — send again to use its tools.`))
+          .catch((e) => toast.error(e instanceof Error ? e.message : String(e)))
+      },
+    },
+  })
+}
 
 export interface GatheredTools {
   defs: ToolDef[]
@@ -60,7 +77,8 @@ export async function gatherTools(includeWebSearch: boolean): Promise<GatheredTo
         })
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : `MCP "${server.name}" failed`)
+      if (err instanceof McpAuthRequiredError) toastAuthRequired(err)
+      else toast.error(err instanceof Error ? err.message : `MCP "${server.name}" failed`)
     }
   }
 
@@ -81,7 +99,13 @@ export async function gatherTools(includeWebSearch: boolean): Promise<GatheredTo
     }
     const route = mcpRoutes.get(name)
     if (!route) return `Error: unknown tool "${name}"`
-    return route(args, signal)
+    try {
+      return await route(args, signal)
+    } catch (err) {
+      // Token expired mid-conversation: tell the user how to fix it, tell the model why it failed.
+      if (err instanceof McpAuthRequiredError) toastAuthRequired(err)
+      throw err
+    }
   }
 
   return { defs, execute, sources }

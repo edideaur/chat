@@ -12,7 +12,7 @@ Your endpoints, API keys, and chats live in your browser. The server is only inv
 - **Multi-model compare** — pick 2+ models, watch them stream side by side, then promote one response to continue the thread.
 - **Attachments** — images sent as multimodal content parts; text files inlined into the prompt.
 - **Web search** via [Exa](https://exa.ai) using your own Exa key, with cited sources under the response. Models that support tool calling get it as a `web_search` tool and decide when to search; other models get results injected up front.
-- **MCP servers** — connect remote [Model Context Protocol](https://modelcontextprotocol.io) servers (Streamable HTTP transport, CORS required); their tools are offered to tool-capable models automatically.
+- **MCP servers** — connect remote [Model Context Protocol](https://modelcontextprotocol.io) servers (Streamable HTTP transport, CORS required); their tools are offered to tool-capable models automatically. Servers that require OAuth are supported end-to-end in the browser: metadata discovery, dynamic client registration, PKCE popup flow, and silent token refresh — tokens stay local like every other key.
 - **Chat ergonomics** — edit + resend, regenerate with version history, rename/delete, `⌘K` search across chats, `⌘⇧O` new chat.
 - **System prompts & sampling** — a global default system prompt plus per-conversation overrides for prompt, temperature, max tokens, model, and endpoint.
 - **Local-first storage** — everything in IndexedDB; the app fully works with zero login.
