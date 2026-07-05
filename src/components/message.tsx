@@ -24,7 +24,7 @@ export function Reasoning({ message }: { message: Message }) {
         <ChevronDown className="size-3 transition-transform group-open/think:rotate-180" />
       </summary>
       <div className="mt-2 border-t border-border/40 pt-2 text-sm **:text-muted-foreground">
-        <Markdown text={message.reasoning} />
+        <Markdown text={message.reasoning} streaming={thinking} />
       </div>
     </details>
   )
@@ -180,8 +180,8 @@ export const MessageBubble = memo(function MessageBubble({
       )}
       <Reasoning message={message} />
       <div>
-        <Markdown text={message.content} />
-        {message.status === "streaming" && (
+        <Markdown text={message.content} streaming={message.status === "streaming"} />
+        {message.status === "streaming" && !message.content && !message.reasoning && (
           <span className="mt-1 inline-block h-4 w-2 animate-pulse rounded-xs bg-primary/70" />
         )}
       </div>

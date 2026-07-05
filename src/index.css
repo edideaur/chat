@@ -199,6 +199,32 @@
   background: transparent !important;
 }
 
+/* Streaming cursor: rides the last character of whatever was rendered last. */
+@keyframes cursor-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.md-streaming > :last-child:is(p, h1, h2, h3, h4, h5, h6)::after,
+.md-streaming > blockquote:last-child p:last-child::after,
+.md-streaming > :is(ul, ol):last-child li:last-child::after,
+.md-streaming > div:last-child pre code::after {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--primary), transparent 30%);
+  animation: cursor-blink 1s ease-in-out infinite;
+}
+
 @keyframes shine {
   0% {
     background-position: 100% 50%;

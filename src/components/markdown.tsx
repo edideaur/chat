@@ -10,6 +10,7 @@ import "katex/dist/katex.min.css"
 import "highlight.js/styles/github-dark.css"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 function CodeBlock({ children }: { children?: ReactNode }) {
   const ref = useRef<HTMLPreElement>(null)
@@ -52,9 +53,20 @@ function CodeBlock({ children }: { children?: ReactNode }) {
 
 // ponytail: react-markdown re-parses the whole message at ~10Hz while streaming;
 // render the tail as plain text if very long messages ever jank.
-export const Markdown = memo(function Markdown({ text }: { text: string }) {
+export const Markdown = memo(function Markdown({
+  text,
+  streaming = false,
+}: {
+  text: string
+  streaming?: boolean
+}) {
   return (
-    <div className="prose prose-invert max-w-none text-[0.95rem] leading-relaxed prose-p:my-2.5 prose-headings:mt-5 prose-headings:mb-2.5 prose-code:rounded-md prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-li:my-0.5 prose-table:text-sm">
+    <div
+      className={cn(
+        "prose prose-invert max-w-none text-[0.95rem] leading-relaxed prose-p:my-2.5 prose-headings:mt-5 prose-headings:mb-2.5 prose-code:rounded-md prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-li:my-0.5 prose-table:text-sm",
+        streaming && "md-streaming"
+      )}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeHighlight, rehypeKatex]}
