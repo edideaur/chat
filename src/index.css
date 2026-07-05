@@ -199,6 +199,19 @@
   background: transparent !important;
 }
 
+/* Inline [n] citations linking to web-search sources */
+.prose a.citation {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 0.72em;
+  font-weight: 550;
+  vertical-align: super;
+  padding-inline: 1px;
+}
+.prose a.citation:hover {
+  text-decoration: underline;
+}
+
 /* Streaming cursor: rides the last character of whatever was rendered last. */
 @keyframes cursor-blink {
   0%,

@@ -27,16 +27,18 @@ export function fetchOpenRouterMeta(): Promise<Map<string, ModelMeta>> {
   return metaPromise
 }
 
-/** Exact id match first, then vendor-suffix match ("gpt-4o" → "openai/gpt-4o"). */
+/** Exact id match first, then vendor-suffix match ("gpt-4o" → "openai/gpt-4o").
+ * Google AI Studio prefixes ids with "models/" ("models/gemini-2.5-pro"). */
 export function lookupMeta(
   meta: Map<string, ModelMeta> | undefined,
   id: string
 ): ModelMeta | undefined {
   if (!meta) return undefined
-  const exact = meta.get(id)
+  const bare = id.replace(/^models\//, "")
+  const exact = meta.get(id) ?? meta.get(bare)
   if (exact) return exact
   for (const m of meta.values()) {
-    if (m.id.split("/")[1] === id) return m
+    if (m.id.split("/")[1] === bare) return m
   }
   return undefined
 }

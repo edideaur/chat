@@ -1,4 +1,4 @@
-import { Children, isValidElement, memo, useRef, useState, type ReactNode } from "react"
+import { Children, isValidElement, memo, useMemo, useRef, useState, type ReactNode } from "react"
 import ReactMarkdown from "react-markdown"
 import rehypeHighlight from "rehype-highlight"
 import rehypeKatex from "rehype-katex"
@@ -10,7 +10,56 @@ import "katex/dist/katex.min.css"
 import "highlight.js/styles/github-dark.css"
 
 import { Button } from "@/components/ui/button"
+import type { SearchResult } from "@/lib/db"
 import { cn } from "@/lib/utils"
+
+interface HastNode {
+  type: string
+  tagName?: string
+  value?: string
+  children?: HastNode[]
+  properties?: Record<string, unknown>
+}
+
+/** Turns bare [n] in prose into links to the nth search source (code stays untouched). */
+function makeCitationPlugin(sources: SearchResult[]) {
+  const SKIP = new Set(["code", "pre", "a"])
+  return () => (tree: HastNode) => {
+    const walk = (node: HastNode) => {
+      if (!node.children || (node.tagName && SKIP.has(node.tagName))) return
+      node.children = node.children.flatMap((child) => {
+        if (child.type !== "text" || !child.value || !/\[\d+\]/.test(child.value)) {
+          walk(child)
+          return [child]
+        }
+        const parts: HastNode[] = []
+        let last = 0
+        for (const m of child.value.matchAll(/\[(\d+)\]/g)) {
+          const src = sources[Number(m[1]) - 1]
+          if (!src) continue
+          if (m.index > last) parts.push({ type: "text", value: child.value.slice(last, m.index) })
+          parts.push({
+            type: "element",
+            tagName: "a",
+            properties: {
+              href: src.url,
+              target: "_blank",
+              rel: "noreferrer",
+              title: src.title,
+              className: ["citation"],
+            },
+            children: [{ type: "text", value: m[0] }],
+          })
+          last = m.index + m[0].length
+        }
+        if (!parts.length) return [child]
+        if (last < child.value.length) parts.push({ type: "text", value: child.value.slice(last) })
+        return parts
+      })
+    }
+    walk(tree)
+  }
+}
 
 function CodeBlock({ children }: { children?: ReactNode }) {
   const ref = useRef<HTMLPreElement>(null)
@@ -56,10 +105,20 @@ function CodeBlock({ children }: { children?: ReactNode }) {
 export const Markdown = memo(function Markdown({
   text,
   streaming = false,
+  sources,
 }: {
   text: string
   streaming?: boolean
+  sources?: SearchResult[]
 }) {
+  const rehypePlugins = useMemo(
+    () => [
+      rehypeHighlight,
+      rehypeKatex,
+      ...(sources?.length ? [makeCitationPlugin(sources)] : []),
+    ],
+    [sources]
+  )
   return (
     <div
       className={cn(
@@ -69,7 +128,7 @@ export const Markdown = memo(function Markdown({
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeHighlight, rehypeKatex]}
+        rehypePlugins={rehypePlugins}
         components={{
           pre: CodeBlock,
           a: (props) => <a {...props} target="_blank" rel="noreferrer" />,

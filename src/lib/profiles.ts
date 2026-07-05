@@ -31,6 +31,11 @@ export const PRESETS: Preset[] = [
   { name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1" },
   { name: "OpenAI", baseUrl: "https://api.openai.com/v1" },
   { name: "Anthropic", baseUrl: "https://api.anthropic.com/v1" },
+  {
+    name: "Google AI Studio",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    hint: "Model ids are prefixed with models/, e.g. models/gemini-2.5-pro.",
+  },
   { name: "Groq", baseUrl: "https://api.groq.com/openai/v1" },
   { name: "Together", baseUrl: "https://api.together.xyz/v1" },
   { name: "Mistral", baseUrl: "https://api.mistral.ai/v1" },

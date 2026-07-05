@@ -155,10 +155,14 @@ function CopyButton({ text }: { text: string }) {
 export const MessageBubble = memo(function MessageBubble({
   message,
   canRegenerate = false,
+  sources,
 }: {
   message: Message
   canRegenerate?: boolean
+  /** Search results for citation links; defaults to the message's own. */
+  sources?: Message["searchResults"]
 }) {
+  const citeSources = message.searchResults ?? sources
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
 
@@ -227,7 +231,11 @@ export const MessageBubble = memo(function MessageBubble({
         <ToolChips calls={message.toolCalls} />
       )}
       <div>
-        <Markdown text={message.content} streaming={message.status === "streaming"} />
+        <Markdown
+          text={message.content}
+          streaming={message.status === "streaming"}
+          sources={citeSources}
+        />
         {message.status === "streaming" && !message.content && !message.reasoning && (
           <span className="mt-1 inline-block h-4 w-2 animate-pulse rounded-xs bg-primary/70" />
         )}

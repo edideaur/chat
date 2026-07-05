@@ -7,8 +7,15 @@ import { promoteReply, type Message, type SearchResult } from "@/lib/db"
 import { stopGeneration } from "@/lib/generation"
 import { cn } from "@/lib/utils"
 
-function CompareCard({ message }: { message: Message }) {
+function CompareCard({
+  message,
+  sources,
+}: {
+  message: Message
+  sources?: SearchResult[]
+}) {
   const settled = message.status === "done" || message.status === "stopped"
+  const citeSources = message.searchResults ?? sources
   return (
     <div className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card/40 backdrop-blur-sm">
       <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3 py-1.5">
@@ -37,7 +44,11 @@ function CompareCard({ message }: { message: Message }) {
                 <ToolChips calls={message.toolCalls} />
               </div>
             )}
-            <Markdown text={message.content} streaming={message.status === "streaming"} />
+            <Markdown
+              text={message.content}
+              streaming={message.status === "streaming"}
+              sources={citeSources}
+            />
             {message.status === "streaming" && !message.content && !message.reasoning && (
               <span className="mt-1 inline-block h-4 w-2 animate-pulse rounded-xs bg-primary/70" />
             )}
@@ -84,7 +95,7 @@ export function ReplyGroup({
   if (group.length === 1) {
     return (
       <div className="flex flex-col gap-2">
-        <MessageBubble message={group[0]} canRegenerate={canRegenerate} />
+        <MessageBubble message={group[0]} canRegenerate={canRegenerate} sources={sources} />
         {footer}
       </div>
     )
@@ -101,7 +112,7 @@ export function ReplyGroup({
           )}
         >
           {group.map((m) => (
-            <CompareCard key={m.id} message={m} />
+            <CompareCard key={m.id} message={m} sources={sources} />
           ))}
         </div>
         {footer}
@@ -112,7 +123,7 @@ export function ReplyGroup({
   const idx = group.indexOf(active)
   return (
     <div className="flex flex-col gap-1">
-      <MessageBubble message={active} canRegenerate={canRegenerate} />
+      <MessageBubble message={active} canRegenerate={canRegenerate} sources={sources} />
       {footer}
       <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <Button
