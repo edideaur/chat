@@ -1,9 +1,10 @@
 import { useRef, useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
-import { ArrowUp, FileText, Plus, Square, X } from "lucide-react"
+import { ArrowUp, FileText, Plus, SlidersHorizontal, Square, X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
+import { ChatSettings } from "@/components/chat-settings"
 import { ModelPicker } from "@/components/model-picker"
 import { Button } from "@/components/ui/button"
 import { db, type Message } from "@/lib/db"
@@ -26,6 +27,7 @@ interface ComposerProps {
 export function Composer({ convId, className }: ComposerProps) {
   const [text, setText] = useState("")
   const [pending, setPending] = useState<Pending[]>([])
+  const [chatSettingsOpen, setChatSettingsOpen] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const prefs = usePrefs()
@@ -155,6 +157,17 @@ export function Composer({ convId, className }: ComposerProps) {
             placeholder="Ask anything"
             className="max-h-44 flex-1 resize-none self-center bg-transparent px-1 py-1.5 text-[0.95rem] outline-none field-sizing-content placeholder:text-muted-foreground"
           />
+          {convId && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 rounded-full text-muted-foreground"
+              aria-label="Chat settings"
+              onClick={() => setChatSettingsOpen(true)}
+            >
+              <SlidersHorizontal className="size-4" />
+            </Button>
+          )}
           <ModelPicker profile={profile} />
           {isStreaming ? (
             <Button
@@ -179,6 +192,13 @@ export function Composer({ convId, className }: ComposerProps) {
           )}
         </div>
       </div>
+      {convId && (
+        <ChatSettings
+          convId={convId}
+          open={chatSettingsOpen}
+          onOpenChange={setChatSettingsOpen}
+        />
+      )}
     </div>
   )
 }

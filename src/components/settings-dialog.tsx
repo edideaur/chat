@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   normalizeBaseUrl,
   PRESETS,
@@ -98,6 +99,19 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="global-system">Default system prompt</Label>
+            <Textarea
+              id="global-system"
+              value={prefs.globalSystemPrompt ?? ""}
+              onChange={(e) =>
+                setPrefs({ globalSystemPrompt: e.target.value || undefined })
+              }
+              placeholder="Applied to every new chat unless overridden per conversation."
+              className="min-h-20"
+            />
+          </div>
+
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium">Endpoints</h3>
             <Button variant="outline" size="sm" onClick={startNew}>
