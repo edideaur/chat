@@ -35,7 +35,7 @@ export const AGENT_TOOL_DEFS: ToolDef[] = [
     function: {
       name: "create_artifact",
       description:
-        "Create or completely rewrite a web app/site/visualization, rendered instantly for the user in a live preview panel beside the chat. Provide ONE complete, self-contained HTML document: inline <style> and <script>; external resources only via https CDN urls (e.g. https://cdn.tailwindcss.com, unpkg.com, cdn.jsdelivr.net). It runs in a sandboxed iframe with no network restrictions but no access to the parent page. Use this whenever the user asks for a UI, website, app, game, form, or interactive visualization. Reuse the same id to replace an artifact; prefer edit_artifact for small changes.",
+        "Create or completely rewrite a web app/site/visualization, rendered instantly for the user in a live preview panel beside the chat. Provide ONE complete, self-contained HTML document: inline <style> and <script>; external resources only via https CDN urls (e.g. https://cdn.tailwindcss.com, unpkg.com, cdn.jsdelivr.net). It runs in a sandboxed iframe with no network restrictions but no access to the parent page. Use this whenever the user asks for a UI, website, app, game, form, or interactive visualization. KEEP THE DOCUMENT COMPACT — your output token budget is limited, so start with a solid core version and extend it with edit_artifact calls rather than emitting one huge document. Reuse the same id to replace an artifact.",
       parameters: {
         type: "object",
         properties: {

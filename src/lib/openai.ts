@@ -50,6 +50,8 @@ export interface CompletionRequest {
 
 export interface CompletionResult {
   toolCalls: ToolCall[]
+  /** "length" means the output was cut off by the max-tokens limit. */
+  finishReason?: string
 }
 
 function errorMessage(payload: unknown, fallback: string): string {
@@ -129,14 +131,19 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<Comp
   if (!res.headers.get("content-type")?.includes("text/event-stream")) {
     const json = await res.json()
     if (json.error) throw new ApiError(errorMessage(json, "Request failed"))
-    const message = json.choices?.[0]?.message
+    const choice = json.choices?.[0]
+    const message = choice?.message
     const reasoning = message?.reasoning_content ?? message?.reasoning
     if (reasoning) req.onReasoning?.(reasoning)
     if (message?.content) req.onDelta(message.content)
-    return { toolCalls: (message?.tool_calls ?? []) as ToolCall[] }
+    return {
+      toolCalls: (message?.tool_calls ?? []) as ToolCall[],
+      finishReason: choice?.finish_reason ?? undefined,
+    }
   }
 
   let streamError: string | null = null
+  let finishReason: string | undefined
   const parser = createParser({
     onEvent(event) {
       if (event.data === "[DONE]") return
@@ -149,6 +156,7 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<Comp
       const obj = json as {
         error?: unknown
         choices?: {
+          finish_reason?: string | null
           delta?: {
             content?: string
             reasoning_content?: string
@@ -161,7 +169,9 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<Comp
         streamError = errorMessage(obj, "Provider returned an error mid-stream")
         return
       }
-      const delta = obj.choices?.[0]?.delta
+      const choice = obj.choices?.[0]
+      if (choice?.finish_reason) finishReason = choice.finish_reason
+      const delta = choice?.delta
       const reasoning = delta?.reasoning_content ?? delta?.reasoning
       if (reasoning) req.onReasoning?.(reasoning)
       if (delta?.content) req.onDelta(delta.content)
@@ -186,5 +196,6 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<Comp
     toolCalls: toolCalls
       .filter(Boolean)
       .map((tc, i) => ({ ...tc, id: tc.id || `call_${i}` })),
+    finishReason,
   }
 }

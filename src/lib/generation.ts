@@ -25,9 +25,20 @@ import { gatherTools } from "@/lib/tools"
 // Module singleton: survives route changes; Dexie is the source of truth for UI.
 const controllers = new Map<string, AbortController>()
 
-const DEFAULT_MAX_TOKENS = 8192
+// Artifacts easily exceed 8K output tokens; models that reject a high cap get
+// one bare retry (see requestRound), so err on the generous side.
+const DEFAULT_MAX_TOKENS = 32768
 // Generous: agentic builds chain ask → create → edit → edit → … before answering.
 const MAX_TOOL_ROUNDS = 12
+
+function isValidJson(s: string): boolean {
+  try {
+    JSON.parse(s || "{}")
+    return true
+  } catch {
+    return false
+  }
+}
 
 function lastUserText(transcript: ChatMessage[]): string {
   for (let i = transcript.length - 1; i >= 0; i--) {
@@ -271,7 +282,12 @@ export async function startAssistant(
           }
           result = await requestRound(transcript, [])
         }
-        if (!result.toolCalls.length) break
+        if (!result.toolCalls.length) {
+          if (result.finishReason === "length") {
+            buf += "\n\n*(response was cut off by the max tokens limit)*"
+          }
+          break
+        }
 
         for (const tc of result.toolCalls) {
           journal.push({
@@ -282,27 +298,42 @@ export async function startAssistant(
           })
         }
         await db.messages.update(msg.id, { toolCalls: [...journal] })
+        // Truncated/malformed argument JSON must never go back to the provider —
+        // Anthropic and others 400 on it. Sanitize in the transcript, then report
+        // the failure to the model via the tool result so it can retry smaller.
         transcript.push({
           role: "assistant",
           content: roundBuf || null,
-          tool_calls: result.toolCalls,
+          tool_calls: result.toolCalls.map((tc) =>
+            isValidJson(tc.function.arguments)
+              ? tc
+              : { ...tc, function: { ...tc.function, arguments: "{}" } }
+          ),
         })
 
         for (const tc of result.toolCalls) {
           const entry = journal.find((j) => j.id === tc.id && j.status === "running")
           let output: string
-          try {
-            output = await gathered.execute(
-              tc.function.name,
-              tc.function.arguments,
-              controller.signal,
-              tc.id
-            )
-            if (entry) entry.status = "done"
-          } catch (err) {
-            if (controller.signal.aborted) throw err
-            output = `Error: ${err instanceof Error ? err.message : String(err)}`
+          if (!isValidJson(tc.function.arguments)) {
+            output =
+              result.finishReason === "length"
+                ? `Error: the ${tc.function.name} call was cut off by the output token limit before its arguments were complete. Produce a more compact version (the user can also raise max tokens in chat settings), then call the tool again.`
+                : `Error: the ${tc.function.name} arguments were not valid JSON. Call the tool again with corrected arguments.`
             if (entry) entry.status = "error"
+          } else {
+            try {
+              output = await gathered.execute(
+                tc.function.name,
+                tc.function.arguments,
+                controller.signal,
+                tc.id
+              )
+              if (entry) entry.status = "done"
+            } catch (err) {
+              if (controller.signal.aborted) throw err
+              output = `Error: ${err instanceof Error ? err.message : String(err)}`
+              if (entry) entry.status = "error"
+            }
           }
           transcript.push({ role: "tool", tool_call_id: tc.id, content: output })
           await db.messages.update(msg.id, { toolCalls: [...journal] })
