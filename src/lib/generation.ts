@@ -1,6 +1,7 @@
 import { toast } from "sonner"
 
 import {
+  autoTitle,
   createConversation,
   db,
   nextSeq,
@@ -133,6 +134,48 @@ export async function startAssistant(
   })()
 
   return msg.id
+}
+
+/** Demote the current reply and stream a fresh sibling for the same user message. */
+export async function regenerate(assistantMsgId: string) {
+  const msg = await db.messages.get(assistantMsgId)
+  if (!msg || msg.role !== "assistant" || !msg.replyTo) return
+  const conv = await db.conversations.get(msg.convId)
+  const prefs = getPrefs()
+  // Prefer the endpoint/model that produced the original reply; fall back to current target.
+  const sameProfile = prefs.profiles.find((p) => p.id === msg.profileId)
+  const target = sameProfile && msg.model
+    ? { profile: sameProfile, model: msg.model }
+    : resolveTarget(conv)
+  await db.messages.update(assistantMsgId, { active: false })
+  await startAssistant(msg.convId, msg.replyTo, { ...target, active: true })
+}
+
+/** Rewrite a user message, drop everything after it, and resend. */
+export async function editResend(userMsgId: string, newText: string) {
+  const msg = await db.messages.get(userMsgId)
+  if (!msg || msg.role !== "user") return
+  const conv = await db.conversations.get(msg.convId)
+  const target = resolveTarget(conv)
+
+  const after = await db.messages
+    .where("convId")
+    .equals(msg.convId)
+    .filter((m) => m.seq > msg.seq)
+    .toArray()
+  for (const m of after) stopGeneration(m.id)
+
+  await db.transaction("rw", db.messages, db.attachments, db.conversations, async () => {
+    const attachmentIds = after.flatMap((m) => m.attachmentIds ?? [])
+    if (attachmentIds.length) await db.attachments.bulkDelete(attachmentIds)
+    await db.messages.bulkDelete(after.map((m) => m.id))
+    await db.messages.update(userMsgId, { content: newText })
+    if (msg.seq === 0) {
+      await db.conversations.update(msg.convId, { title: autoTitle(newText) })
+    }
+  })
+
+  await startAssistant(msg.convId, userMsgId, { ...target, active: true })
 }
 
 /** Send a user message; creates the conversation when convId is null. Returns the convId. */

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
 import { Menu } from "lucide-react"
-import { Outlet } from "react-router-dom"
+import { Outlet, useNavigate } from "react-router-dom"
 
 import { AppSidebar } from "@/components/app-sidebar"
+import { ChatSearch } from "@/components/chat-search"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { Button } from "@/components/ui/button"
 import { usePrefs } from "@/lib/profiles"
@@ -10,12 +11,30 @@ import { usePrefs } from "@/lib/profiles"
 export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const prefs = usePrefs()
+  const navigate = useNavigate()
 
   // First run: no endpoints configured yet.
   useEffect(() => {
     if (prefs.profiles.length === 0) setSettingsOpen(true)
   }, [prefs.profiles.length])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key === "k") {
+        e.preventDefault()
+        setSearchOpen((v) => !v)
+      }
+      if (mod && e.shiftKey && e.key.toLowerCase() === "o") {
+        e.preventDefault()
+        navigate("/")
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [navigate])
 
   return (
     <div className="flex h-svh overflow-hidden">
@@ -23,6 +42,7 @@ export function App() {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSearch={() => setSearchOpen(true)}
       />
       <main className="relative flex min-w-0 flex-1 flex-col">
         <div className="flex items-center p-2 md:hidden">
@@ -38,6 +58,7 @@ export function App() {
         <Outlet />
       </main>
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <ChatSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   )
 }

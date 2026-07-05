@@ -1,6 +1,14 @@
 import { useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
-import { MessageSquarePlus, MoreHorizontal, Pencil, Search, Settings, Trash2 } from "lucide-react"
+import {
+  Loader2,
+  MessageSquarePlus,
+  MoreHorizontal,
+  Pencil,
+  Search,
+  Settings,
+  Trash2,
+} from "lucide-react"
 import { NavLink, useNavigate, useParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
@@ -19,9 +27,15 @@ interface AppSidebarProps {
   open: boolean
   onClose: () => void
   onOpenSettings: () => void
+  onOpenSearch: () => void
 }
 
-export function AppSidebar({ open, onClose, onOpenSettings }: AppSidebarProps) {
+export function AppSidebar({
+  open,
+  onClose,
+  onOpenSettings,
+  onOpenSearch,
+}: AppSidebarProps) {
   const navigate = useNavigate()
   const { id: activeId } = useParams<{ id: string }>()
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -30,6 +44,10 @@ export function AppSidebar({ open, onClose, onOpenSettings }: AppSidebarProps) {
   const conversations = useLiveQuery(() =>
     db.conversations.orderBy("updatedAt").reverse().toArray()
   )
+  const streamingConvIds = useLiveQuery(async () => {
+    const rows = await db.messages.where("status").equals("streaming").toArray()
+    return new Set(rows.map((m) => m.convId))
+  })
 
   const commitRename = async () => {
     if (renamingId && renameValue.trim()) {
@@ -76,9 +94,17 @@ export function AppSidebar({ open, onClose, onOpenSettings }: AppSidebarProps) {
             <MessageSquarePlus />
             New chat
           </Button>
-          <Button variant="ghost" className="justify-start gap-2 rounded-full">
+          <Button
+            variant="ghost"
+            className="justify-start gap-2 rounded-full"
+            onClick={() => {
+              onOpenSearch()
+              onClose()
+            }}
+          >
             <Search />
             Search chats
+            <kbd className="ml-auto text-xs text-muted-foreground/70">⌘K</kbd>
           </Button>
         </div>
 
@@ -118,10 +144,13 @@ export function AppSidebar({ open, onClose, onOpenSettings }: AppSidebarProps) {
                     <NavLink
                       to={`/c/${c.id}`}
                       onClick={onClose}
-                      className="min-w-0 flex-1 truncate px-2 py-1.5 text-sm"
+                      className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-sm"
                       title={c.title}
                     >
-                      {c.title}
+                      <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                      {streamingConvIds?.has(c.id) && (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+                      )}
                     </NavLink>
                     <DropdownMenu>
                       <DropdownMenuTrigger

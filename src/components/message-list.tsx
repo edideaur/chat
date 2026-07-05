@@ -14,6 +14,7 @@ export function MessageList({ messages }: { messages: Message[] }) {
   }, [messages])
 
   const visible = messages.filter((m) => m.role === "user" || m.active)
+  const lastUserId = [...messages].reverse().find((m) => m.role === "user")?.id
 
   return (
     <div
@@ -26,7 +27,11 @@ export function MessageList({ messages }: { messages: Message[] }) {
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
         {visible.map((m) => (
-          <MessageBubble key={m.id} message={m} />
+          <MessageBubble
+            key={m.id}
+            message={m}
+            canRegenerate={m.role === "assistant" && m.replyTo === lastUserId}
+          />
         ))}
       </div>
     </div>
