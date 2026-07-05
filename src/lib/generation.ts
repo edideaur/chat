@@ -9,19 +9,53 @@ import {
   type Conversation,
   type Message,
 } from "@/lib/db"
+import { fetchOpenRouterMeta, lookupMeta } from "@/hooks/use-models"
 import { exaSearch, searchContextBlock } from "@/lib/exa"
 import {
   ApiError,
   streamChatCompletion,
   type ChatMessage,
+  type CompletionResult,
   type ContentPart,
+  type ToolDef,
 } from "@/lib/openai"
 import { activeProfile, getPrefs, type Profile } from "@/lib/profiles"
+import { gatherTools } from "@/lib/tools"
 
 // Module singleton: survives route changes; Dexie is the source of truth for UI.
 const controllers = new Map<string, AbortController>()
 
 const DEFAULT_MAX_TOKENS = 8192
+const MAX_TOOL_ROUNDS = 5
+
+function lastUserText(transcript: ChatMessage[]): string {
+  for (let i = transcript.length - 1; i >= 0; i--) {
+    const m = transcript[i]
+    if (m.role === "user") {
+      if (typeof m.content === "string") return m.content
+      return m.content.find((p): p is ContentPart & { type: "text" } => p.type === "text")?.text ?? ""
+    }
+  }
+  return ""
+}
+
+function injectSearchResults(
+  transcript: ChatMessage[],
+  results: NonNullable<Message["searchResults"]>
+) {
+  for (let i = transcript.length - 1; i >= 0; i--) {
+    const m = transcript[i]
+    if (m.role !== "user") continue
+    const block = searchContextBlock(results)
+    if (typeof m.content === "string") m.content += block
+    else {
+      const textPart = m.content.find((p): p is ContentPart & { type: "text" } => p.type === "text")
+      if (textPart) textPart.text += block
+      else m.content.unshift({ type: "text", text: block })
+    }
+    return
+  }
+}
 
 export function stopGeneration(msgId: string) {
   controllers.get(msgId)?.abort()
@@ -108,7 +142,7 @@ async function buildContext(convId: string, uptoSeq: number): Promise<ChatMessag
 export async function startAssistant(
   convId: string,
   replyTo: string,
-  opts: { profile: Profile; model: string; active: boolean }
+  opts: { profile: Profile; model: string; active: boolean; webSearch?: boolean }
 ): Promise<string> {
   const conv = await db.conversations.get(convId)
   const msg: Message = {
@@ -133,6 +167,7 @@ export async function startAssistant(
 
   // Throttled write-through: at most ~10 IDB writes/sec per stream.
   let buf = ""
+  let roundBuf = ""
   let reasonBuf = ""
   let timer: number | undefined
   const patch = () => ({ content: buf, reasoning: reasonBuf || undefined })
@@ -144,6 +179,8 @@ export async function startAssistant(
     if (timer === undefined) timer = window.setTimeout(flush, 100)
   }
   const onDelta = (text: string) => {
+    if (!roundBuf && buf) buf += "\n\n" // visual break between tool rounds
+    roundBuf += text
     buf += text
     schedule()
   }
@@ -153,40 +190,129 @@ export async function startAssistant(
   }
 
   const userMax = conv?.settings?.maxTokens
-  const request = (maxTokens?: number) =>
-    streamChatCompletion({
-      baseUrl: opts.profile.baseUrl,
-      apiKey: opts.profile.apiKey,
-      model: opts.model,
-      messages: context,
-      temperature: conv?.settings?.temperature,
-      maxTokens,
-      signal: controller.signal,
-      onDelta,
-      onReasoning,
-    })
+  const requestRound = async (
+    transcript: ChatMessage[],
+    tools: ToolDef[]
+  ): Promise<CompletionResult> => {
+    const doRequest = (maxTokens?: number) =>
+      streamChatCompletion({
+        baseUrl: opts.profile.baseUrl,
+        apiKey: opts.profile.apiKey,
+        model: opts.model,
+        messages: transcript,
+        tools: tools.length ? tools : undefined,
+        temperature: conv?.settings?.temperature,
+        maxTokens,
+        signal: controller.signal,
+        onDelta,
+        onReasoning,
+      })
+    try {
+      // Without a generous default, some providers cap output low (Anthropic
+      // compat, Ollama) and cut responses off mid-sentence.
+      return await doRequest(userMax ?? DEFAULT_MAX_TOKENS)
+    } catch (err) {
+      // Models that reject the param (over their cap, or want
+      // max_completion_tokens) get one bare retry — only if we defaulted it.
+      const rejected =
+        err instanceof ApiError &&
+        err.status === 400 &&
+        /max_?(completion_)?tokens/i.test(err.message)
+      if (userMax === undefined && rejected && !controller.signal.aborted) {
+        return doRequest(undefined)
+      }
+      throw err
+    }
+  }
 
   void (async () => {
     try {
-      try {
-        // Without a generous default, some providers cap output low (Anthropic
-        // compat, Ollama) and cut responses off mid-sentence.
-        await request(userMax ?? DEFAULT_MAX_TOKENS)
-      } catch (err) {
-        // Models that reject the param (over their cap, or want
-        // max_completion_tokens) get one bare retry — only if we defaulted it.
-        const rejected =
-          err instanceof ApiError &&
-          err.status === 400 &&
-          /max_?(completion_)?tokens/i.test(err.message)
-        if (userMax === undefined && rejected && !controller.signal.aborted) {
-          await request(undefined)
-        } else {
-          throw err
+      const meta = lookupMeta(
+        await fetchOpenRouterMeta().catch(() => undefined),
+        opts.model
+      )
+      const toolsAllowed = meta?.supportsTools !== false
+      const gathered = toolsAllowed
+        ? await gatherTools(!!opts.webSearch)
+        : { defs: [], execute: async () => "", sources: [] as NonNullable<Message["searchResults"]> }
+
+      // Metadata says no tools but search was requested → classic inject mode.
+      if (!toolsAllowed && opts.webSearch) {
+        const results = await exaSearch(lastUserText(context))
+        injectSearchResults(context, results)
+        gathered.sources.push(...results)
+      }
+
+      const transcript: ChatMessage[] = [...context]
+      let tools = gathered.defs
+      const journal: NonNullable<Message["toolCalls"]> = []
+
+      for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        roundBuf = ""
+        if (round === MAX_TOOL_ROUNDS - 1) tools = [] // force a final text answer
+        let result: CompletionResult
+        try {
+          result = await requestRound(transcript, tools)
+        } catch (err) {
+          const toolsRejected =
+            tools.length > 0 &&
+            err instanceof ApiError &&
+            err.status === 400 &&
+            /tool/i.test(err.message)
+          if (!toolsRejected || controller.signal.aborted) throw err
+          // Endpoint rejected the tools param: degrade gracefully — inject the
+          // search results the tool would have fetched, then retry bare.
+          tools = []
+          if (opts.webSearch) {
+            const results = await exaSearch(lastUserText(transcript))
+            injectSearchResults(transcript, results)
+            gathered.sources.push(...results)
+          }
+          result = await requestRound(transcript, [])
+        }
+        if (!result.toolCalls.length) break
+
+        for (const tc of result.toolCalls) {
+          journal.push({
+            id: tc.id,
+            name: tc.function.name,
+            args: tc.function.arguments,
+            status: "running",
+          })
+        }
+        await db.messages.update(msg.id, { toolCalls: [...journal] })
+        transcript.push({
+          role: "assistant",
+          content: roundBuf || null,
+          tool_calls: result.toolCalls,
+        })
+
+        for (const tc of result.toolCalls) {
+          const entry = journal.find((j) => j.id === tc.id && j.status === "running")
+          let output: string
+          try {
+            output = await gathered.execute(
+              tc.function.name,
+              tc.function.arguments,
+              controller.signal
+            )
+            if (entry) entry.status = "done"
+          } catch (err) {
+            if (controller.signal.aborted) throw err
+            output = `Error: ${err instanceof Error ? err.message : String(err)}`
+            if (entry) entry.status = "error"
+          }
+          transcript.push({ role: "tool", tool_call_id: tc.id, content: output })
+          await db.messages.update(msg.id, { toolCalls: [...journal] })
         }
       }
+
       window.clearTimeout(timer)
-      await db.messages.update(msg.id, { ...patch(), status: "done" })
+      await db.messages.update(msg.id, {
+        ...patch(),
+        status: "done",
+        ...(gathered.sources.length && { searchResults: gathered.sources }),
+      })
     } catch (err) {
       window.clearTimeout(timer)
       if (controller.signal.aborted) {
@@ -220,8 +346,15 @@ export async function regenerate(assistantMsgId: string) {
   const target = sameProfile && msg.model
     ? { profile: sameProfile, model: msg.model }
     : resolveTarget(conv)
+  // Re-offer web search if the original reply used it as a tool (inject mode
+  // replays automatically via the user message's stored results).
+  const userMsg = await db.messages.get(msg.replyTo)
+  const webSearch =
+    !userMsg?.searchResults?.length &&
+    (!!msg.searchResults?.length ||
+      (msg.toolCalls ?? []).some((t) => t.name === "web_search"))
   await db.messages.update(assistantMsgId, { active: false })
-  await startAssistant(msg.convId, msg.replyTo, { ...target, active: true })
+  await startAssistant(msg.convId, msg.replyTo, { ...target, active: true, webSearch })
 }
 
 /** Rewrite a user message, drop everything after it, and resend. */
@@ -261,8 +394,22 @@ export async function sendMessage(
   let conv = convId ? await db.conversations.get(convId) : undefined
   const target = resolveTarget(conv) // throws before any writes if unconfigured
 
-  // Search before any writes so a failed search aborts the send cleanly.
-  const searchResults = opts.webSearch ? await exaSearch(text) : undefined
+  // Tool mode: models that support tool calling get a web_search tool and
+  // decide when to use it. If any target model is known not to support tools,
+  // search up front and inject the results for everyone (shared context).
+  let searchResults: Message["searchResults"]
+  let toolWebSearch = false
+  if (opts.webSearch) {
+    if (!getPrefs().exaKey) {
+      throw new Error("Add your Exa API key in Settings to use web search.")
+    }
+    const metaMap = await fetchOpenRouterMeta().catch(() => undefined)
+    const anyWithoutTools = target.models.some(
+      (m) => lookupMeta(metaMap, m)?.supportsTools === false
+    )
+    if (anyWithoutTools) searchResults = await exaSearch(text)
+    else toolWebSearch = true
+  }
 
   if (!conv) {
     conv = await createConversation(text)
@@ -303,10 +450,15 @@ export async function sendMessage(
         profile: target.profile,
         model,
         active: false,
+        webSearch: toolWebSearch,
       })
     }
   } else {
-    await startAssistant(conv.id, userMsg.id, { ...target, active: true })
+    await startAssistant(conv.id, userMsg.id, {
+      ...target,
+      active: true,
+      webSearch: toolWebSearch,
+    })
   }
   return conv.id
 }

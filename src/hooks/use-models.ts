@@ -8,6 +8,23 @@ export interface ModelMeta {
   contextLength?: number
   pricing?: { prompt?: string; completion?: string }
   modality?: string
+  supportsTools?: boolean
+}
+
+// Module-level cache so non-React code (generation.ts) can consult metadata too.
+let metaPromise: Promise<Map<string, ModelMeta>> | undefined
+export function fetchOpenRouterMeta(): Promise<Map<string, ModelMeta>> {
+  metaPromise ??= fetch("/api/openrouter/models")
+    .then(async (res) => {
+      if (!res.ok) throw new Error("metadata fetch failed")
+      const json = (await res.json()) as { data: ModelMeta[] }
+      return new Map(json.data.map((m) => [m.id, m]))
+    })
+    .catch((err) => {
+      metaPromise = undefined // retry next time
+      throw err
+    })
+  return metaPromise
 }
 
 /** Exact id match first, then vendor-suffix match ("gpt-4o" → "openai/gpt-4o"). */
@@ -52,12 +69,7 @@ export function useOpenRouterMeta() {
     queryKey: ["openrouter-meta"],
     staleTime: 24 * 3600_000,
     gcTime: 24 * 3600_000,
-    queryFn: async () => {
-      const res = await fetch("/api/openrouter/models")
-      if (!res.ok) throw new Error("metadata fetch failed")
-      const json = (await res.json()) as { data: ModelMeta[] }
-      return new Map(json.data.map((m) => [m.id, m]))
-    },
+    queryFn: fetchOpenRouterMeta,
   })
 }
 

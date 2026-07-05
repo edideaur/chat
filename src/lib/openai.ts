@@ -10,10 +10,21 @@ export interface ContentPartImage {
 }
 export type ContentPart = ContentPartText | ContentPartImage
 
-export interface ChatMessage {
-  role: "system" | "user" | "assistant"
-  content: string | ContentPart[]
+export interface ToolCall {
+  id: string
+  type: "function"
+  function: { name: string; arguments: string }
 }
+
+export interface ToolDef {
+  type: "function"
+  function: { name: string; description?: string; parameters?: unknown }
+}
+
+export type ChatMessage =
+  | { role: "system" | "user"; content: string | ContentPart[] }
+  | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
+  | { role: "tool"; tool_call_id: string; content: string }
 
 export class ApiError extends Error {
   status?: number
@@ -28,12 +39,17 @@ export interface CompletionRequest {
   apiKey: string
   model: string
   messages: ChatMessage[]
+  tools?: ToolDef[]
   temperature?: number
   maxTokens?: number
   signal: AbortSignal
   onDelta: (text: string) => void
   /** Chain-of-thought deltas (`reasoning_content` / `reasoning`), when the model emits them. */
   onReasoning?: (text: string) => void
+}
+
+export interface CompletionResult {
+  toolCalls: ToolCall[]
 }
 
 function errorMessage(payload: unknown, fallback: string): string {
@@ -48,7 +64,24 @@ function errorMessage(payload: unknown, fallback: string): string {
   return fallback
 }
 
-export async function streamChatCompletion(req: CompletionRequest): Promise<void> {
+interface ToolCallDelta {
+  index?: number
+  id?: string
+  function?: { name?: string; arguments?: string }
+}
+
+/** Streamed tool_call fragments arrive keyed by index; concatenate as they come. */
+function accumulateToolCalls(acc: ToolCall[], deltas: ToolCallDelta[] | undefined) {
+  for (const d of deltas ?? []) {
+    const i = d.index ?? 0
+    acc[i] ??= { id: "", type: "function", function: { name: "", arguments: "" } }
+    if (d.id) acc[i].id = d.id
+    if (d.function?.name) acc[i].function.name += d.function.name
+    if (d.function?.arguments) acc[i].function.arguments += d.function.arguments
+  }
+}
+
+export async function streamChatCompletion(req: CompletionRequest): Promise<CompletionResult> {
   const headers: Record<string, string> = { "content-type": "application/json" }
   if (req.apiKey) headers.authorization = `Bearer ${req.apiKey}`
   // Anthropic's OpenAI-compat endpoint rejects browser CORS without this opt-in.
@@ -67,6 +100,7 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<void
         model: req.model,
         messages: req.messages,
         stream: true,
+        ...(req.tools?.length && { tools: req.tools }),
         ...(req.temperature !== undefined && { temperature: req.temperature }),
         ...(req.maxTokens !== undefined && { max_tokens: req.maxTokens }),
       }),
@@ -89,6 +123,8 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<void
     throw new ApiError(detail, res.status)
   }
 
+  const toolCalls: ToolCall[] = []
+
   // Non-streaming server: a single JSON completion instead of SSE.
   if (!res.headers.get("content-type")?.includes("text/event-stream")) {
     const json = await res.json()
@@ -96,8 +132,8 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<void
     const message = json.choices?.[0]?.message
     const reasoning = message?.reasoning_content ?? message?.reasoning
     if (reasoning) req.onReasoning?.(reasoning)
-    req.onDelta(message?.content ?? "")
-    return
+    if (message?.content) req.onDelta(message.content)
+    return { toolCalls: (message?.tool_calls ?? []) as ToolCall[] }
   }
 
   let streamError: string | null = null
@@ -113,7 +149,12 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<void
       const obj = json as {
         error?: unknown
         choices?: {
-          delta?: { content?: string; reasoning_content?: string; reasoning?: string }
+          delta?: {
+            content?: string
+            reasoning_content?: string
+            reasoning?: string
+            tool_calls?: ToolCallDelta[]
+          }
         }[]
       }
       if (obj.error) {
@@ -124,6 +165,7 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<void
       const reasoning = delta?.reasoning_content ?? delta?.reasoning
       if (reasoning) req.onReasoning?.(reasoning)
       if (delta?.content) req.onDelta(delta.content)
+      accumulateToolCalls(toolCalls, delta?.tool_calls)
     },
   })
 
@@ -139,4 +181,10 @@ export async function streamChatCompletion(req: CompletionRequest): Promise<void
     }
   }
   if (streamError) throw new ApiError(streamError)
+
+  return {
+    toolCalls: toolCalls
+      .filter(Boolean)
+      .map((tc, i) => ({ ...tc, id: tc.id || `call_${i}` })),
+  }
 }

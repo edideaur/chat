@@ -7,6 +7,7 @@ interface OpenRouterModel {
   context_length?: number
   pricing?: { prompt?: string; completion?: string }
   architecture?: { modality?: string }
+  supported_parameters?: string[]
 }
 
 // Public metadata proxy: the raw OpenRouter list is ~1MB, so slim it and cache
@@ -28,6 +29,7 @@ openrouter.get("/models", async (c) => {
     contextLength: m.context_length,
     pricing: { prompt: m.pricing?.prompt, completion: m.pricing?.completion },
     modality: m.architecture?.modality,
+    supportsTools: m.supported_parameters?.includes("tools") ?? undefined,
   }))
 
   const res = new Response(JSON.stringify({ data: slim }), {

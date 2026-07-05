@@ -1,6 +1,17 @@
 import { memo, useEffect, useMemo, useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
-import { Brain, Check, ChevronDown, Copy, FileText, Pencil, RefreshCw } from "lucide-react"
+import {
+  Brain,
+  Check,
+  ChevronDown,
+  Copy,
+  FileText,
+  Loader2,
+  Pencil,
+  RefreshCw,
+  Wrench,
+  X,
+} from "lucide-react"
 
 import { Markdown } from "@/components/markdown"
 import { Button } from "@/components/ui/button"
@@ -27,6 +38,39 @@ export function Reasoning({ message }: { message: Message }) {
         <Markdown text={message.reasoning} streaming={thinking} />
       </div>
     </details>
+  )
+}
+
+export function ToolChips({ calls }: { calls: NonNullable<Message["toolCalls"]> }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {calls.map((c, i) => {
+        // MCP tools are qualified "server__tool"; show the tool part.
+        let label = c.name.split("__").pop() ?? c.name
+        try {
+          const args = JSON.parse(c.args) as { query?: unknown }
+          if (typeof args.query === "string") label += `: “${args.query}”`
+        } catch {
+          // args still streaming or malformed — name alone is fine
+        }
+        return (
+          <span
+            key={c.id + i}
+            className="flex max-w-72 items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground"
+            title={c.args}
+          >
+            {c.status === "running" ? (
+              <Loader2 className="size-3 shrink-0 animate-spin text-primary" />
+            ) : c.status === "error" ? (
+              <X className="size-3 shrink-0 text-destructive" />
+            ) : (
+              <Wrench className="size-3 shrink-0 text-primary" />
+            )}
+            <span className="truncate">{label}</span>
+          </span>
+        )
+      })}
+    </div>
   )
 }
 
@@ -179,12 +223,18 @@ export const MessageBubble = memo(function MessageBubble({
         <span className="text-xs text-muted-foreground">{message.model}</span>
       )}
       <Reasoning message={message} />
+      {message.toolCalls && message.toolCalls.length > 0 && (
+        <ToolChips calls={message.toolCalls} />
+      )}
       <div>
         <Markdown text={message.content} streaming={message.status === "streaming"} />
         {message.status === "streaming" && !message.content && !message.reasoning && (
           <span className="mt-1 inline-block h-4 w-2 animate-pulse rounded-xs bg-primary/70" />
         )}
       </div>
+      {message.searchResults && message.status !== "streaming" && (
+        <Sources results={message.searchResults} />
+      )}
       {message.status === "error" && (
         <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {message.error}

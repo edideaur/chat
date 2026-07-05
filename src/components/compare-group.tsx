@@ -1,7 +1,7 @@
 import { Check, ChevronLeft, ChevronRight, Square } from "lucide-react"
 
 import { Markdown } from "@/components/markdown"
-import { MessageBubble, Reasoning, Sources } from "@/components/message"
+import { MessageBubble, Reasoning, Sources, ToolChips } from "@/components/message"
 import { Button } from "@/components/ui/button"
 import { promoteReply, type Message, type SearchResult } from "@/lib/db"
 import { stopGeneration } from "@/lib/generation"
@@ -32,9 +32,19 @@ function CompareCard({ message }: { message: Message }) {
         ) : (
           <>
             <Reasoning message={message} />
+            {message.toolCalls && message.toolCalls.length > 0 && (
+              <div className="mb-2">
+                <ToolChips calls={message.toolCalls} />
+              </div>
+            )}
             <Markdown text={message.content} streaming={message.status === "streaming"} />
             {message.status === "streaming" && !message.content && !message.reasoning && (
               <span className="mt-1 inline-block h-4 w-2 animate-pulse rounded-xs bg-primary/70" />
+            )}
+            {message.searchResults && message.status !== "streaming" && (
+              <div className="mt-2">
+                <Sources results={message.searchResults} />
+              </div>
             )}
           </>
         )}

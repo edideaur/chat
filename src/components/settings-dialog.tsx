@@ -363,11 +363,131 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <p className="text-xs text-muted-foreground">
               Stored in this browser only. Sent per-request through this app's
               proxy (Exa blocks direct browser calls) — never stored or logged
-              server-side.
+              server-side. Models that support tool calling decide when to
+              search; others get results injected up front.
             </p>
           </div>
+
+          <McpSection />
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+const EMPTY_MCP_DRAFT = { name: "", url: "", authToken: "" }
+
+function McpSection() {
+  const prefs = usePrefs()
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState(EMPTY_MCP_DRAFT)
+  const servers = prefs.mcpServers ?? []
+
+  const save = () => {
+    setPrefs({
+      mcpServers: [
+        ...servers,
+        {
+          id: crypto.randomUUID(),
+          name: draft.name.trim(),
+          url: draft.url.trim(),
+          authToken: draft.authToken.trim() || undefined,
+          enabled: true,
+        },
+      ],
+    })
+    setDraft(EMPTY_MCP_DRAFT)
+    setAdding(false)
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <Label>MCP servers</Label>
+        <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+          <Plus data-icon="inline-start" />
+          Add server
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Tools from these servers are offered to models that support tool
+        calling. Servers must speak the Streamable HTTP transport and allow
+        browser (CORS) access. Tokens stay in this browser.
+      </p>
+
+      {servers.map((s) => (
+        <div
+          key={s.id}
+          className="flex items-center gap-2 rounded-lg border border-border/70 bg-card/40 px-3 py-2"
+        >
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-sm font-medium">{s.name}</span>
+            <span className="truncate text-xs text-muted-foreground">{s.url}</span>
+          </div>
+          <Switch
+            checked={s.enabled}
+            onCheckedChange={(on) =>
+              setPrefs({
+                mcpServers: servers.map((x) => (x.id === s.id ? { ...x, enabled: on } : x)),
+              })
+            }
+            aria-label={`Enable ${s.name}`}
+          />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-destructive"
+            aria-label={`Delete ${s.name}`}
+            onClick={() => setPrefs({ mcpServers: servers.filter((x) => x.id !== s.id) })}
+          >
+            <Trash2 />
+          </Button>
+        </div>
+      ))}
+
+      {adding && (
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card/60 p-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="mcp-name">Name</Label>
+            <Input
+              id="mcp-name"
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              placeholder="deepwiki"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="mcp-url">URL</Label>
+            <Input
+              id="mcp-url"
+              value={draft.url}
+              onChange={(e) => setDraft({ ...draft, url: e.target.value })}
+              placeholder="https://mcp.example.com/mcp"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="mcp-token">Bearer token (optional)</Label>
+            <Input
+              id="mcp-token"
+              type="password"
+              value={draft.authToken}
+              onChange={(e) => setDraft({ ...draft, authToken: e.target.value })}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!draft.name.trim() || !/^https?:\/\//.test(draft.url.trim())}
+              onClick={save}
+            >
+              Add server
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

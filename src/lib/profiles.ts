@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react"
 
+import type { McpServerConfig } from "@/lib/mcp"
+
 export interface Profile {
   id: string
   name: string
@@ -14,6 +16,7 @@ export interface Prefs {
   selectedModels?: string[]
   globalSystemPrompt?: string
   exaKey?: string
+  mcpServers?: McpServerConfig[]
   syncEnabled?: boolean
   lastSyncAt?: number
 }

@@ -25,6 +25,13 @@ export interface SearchResult {
 
 export type MessageStatus = "streaming" | "done" | "stopped" | "error"
 
+export interface ToolCallRecord {
+  id: string
+  name: string
+  args: string
+  status: "running" | "done" | "error"
+}
+
 export interface Message {
   id: string
   convId: string
@@ -37,6 +44,7 @@ export interface Message {
   profileId?: string
   replyTo?: string
   reasoning?: string
+  toolCalls?: ToolCallRecord[]
   active: boolean
   status: MessageStatus
   error?: string
