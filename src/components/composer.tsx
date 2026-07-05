@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
-import { ArrowUp, ChevronDown, Plus, Square } from "lucide-react"
+import { ArrowUp, Plus, Square } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
+import { ModelPicker } from "@/components/model-picker"
 import { Button } from "@/components/ui/button"
 import { db, type Message } from "@/lib/db"
 import { sendMessage, stopConversation } from "@/lib/generation"
@@ -71,14 +72,7 @@ export function Composer({ convId, className }: ComposerProps) {
           placeholder="Ask anything"
           className="max-h-44 flex-1 resize-none self-center bg-transparent px-1 py-1.5 text-[0.95rem] outline-none field-sizing-content placeholder:text-muted-foreground"
         />
-        <Button
-          variant="ghost"
-          size="sm"
-          className="max-w-40 shrink-0 gap-1 rounded-full text-muted-foreground"
-        >
-          <span className="truncate">{profile?.defaultModel ?? "model"}</span>
-          <ChevronDown className="size-3.5 shrink-0" />
-        </Button>
+        <ModelPicker profile={profile} />
         {isStreaming ? (
           <Button
             size="icon"

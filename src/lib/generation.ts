@@ -36,7 +36,8 @@ function resolveTarget(conv: Conversation | undefined): {
     prefs.profiles.find((p) => p.id === conv?.settings?.profileId) ??
     activeProfile(prefs)
   if (!profile) throw new Error("Add an endpoint in Settings first.")
-  const model = conv?.settings?.model ?? profile.defaultModel
+  const model =
+    conv?.settings?.model ?? prefs.selectedModels?.[0] ?? profile.defaultModel
   if (!model) throw new Error(`Pick a model for “${profile.name}” first.`)
   return { profile, model }
 }

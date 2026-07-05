@@ -11,6 +11,7 @@ export interface Profile {
 export interface Prefs {
   profiles: Profile[]
   activeProfileId?: string
+  selectedModels?: string[]
   globalSystemPrompt?: string
   exaKey?: string
 }
