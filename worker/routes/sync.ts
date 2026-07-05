@@ -104,6 +104,23 @@ sync.delete("/chats/:id", async (c) => {
   const user = c.get("user")
   const id = c.req.param("id")
   const ts = Date.now()
+
+  // Clean up this chat's attachment blobs before dropping its message rows.
+  const owned = await c.env.DB.prepare(
+    "SELECT 1 FROM conversations WHERE id = ? AND user_id = ?"
+  )
+    .bind(id, user.id)
+    .first()
+  if (owned) {
+    const msgs = await c.env.DB.prepare("SELECT msg_json FROM messages WHERE conv_id = ?")
+      .bind(id)
+      .all<{ msg_json: string }>()
+    const attIds = msgs.results.flatMap(
+      (r) => (JSON.parse(r.msg_json) as { attachmentIds?: string[] }).attachmentIds ?? []
+    )
+    if (attIds.length) await c.env.MEDIA.delete(attIds.map((a) => `${user.id}/${a}`))
+  }
+
   await c.env.DB.batch([
     c.env.DB.prepare(
       "UPDATE conversations SET deleted_at = ?, updated_at = ? WHERE id = ? AND user_id = ?"
@@ -111,6 +128,38 @@ sync.delete("/chats/:id", async (c) => {
     c.env.DB.prepare("DELETE FROM messages WHERE conv_id = ?").bind(id),
   ])
   return c.json({ ok: true })
+})
+
+// ponytail: attachments removed by edit-resend leave orphaned R2 objects; add a
+// sweep if storage ever matters.
+const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
+
+sync.put("/attachments/:id", async (c) => {
+  const user = c.get("user")
+  const id = c.req.param("id")
+  const body = await c.req.arrayBuffer()
+  if (body.byteLength > MAX_ATTACHMENT_BYTES) {
+    return c.json({ error: "too_large", maxBytes: MAX_ATTACHMENT_BYTES }, 413)
+  }
+  await c.env.MEDIA.put(`${user.id}/${id}`, body, {
+    httpMetadata: { contentType: c.req.header("content-type") ?? "application/octet-stream" },
+    customMetadata: { name: c.req.header("x-attachment-name") ?? "attachment" },
+  })
+  return c.json({ ok: true })
+})
+
+sync.get("/attachments/:id", async (c) => {
+  const user = c.get("user")
+  const id = c.req.param("id")
+  const obj = await c.env.MEDIA.get(`${user.id}/${id}`)
+  if (!obj) return c.json({ error: "not_found" }, 404)
+  return new Response(obj.body, {
+    headers: {
+      "content-type": obj.httpMetadata?.contentType ?? "application/octet-stream",
+      "x-attachment-name": obj.customMetadata?.name ?? "attachment",
+      "cache-control": "private, max-age=31536000",
+    },
+  })
 })
 
 export default sync

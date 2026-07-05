@@ -49,6 +49,7 @@ export interface Attachment {
   mime: string
   blob: Blob
   createdAt: number
+  syncedAt?: number
 }
 
 export const db = new Dexie("chat") as Dexie & {

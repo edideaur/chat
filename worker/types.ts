@@ -3,6 +3,7 @@ import type { UserRow } from "./lib/db"
 export interface Bindings {
   ASSETS: Fetcher
   DB: D1Database
+  MEDIA: R2Bucket
   GITHUB_CLIENT_ID: string
   GITHUB_CLIENT_SECRET: string
   COOKIE_SECRET: string

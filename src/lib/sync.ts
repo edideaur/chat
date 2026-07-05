@@ -14,6 +14,41 @@ export function scheduleSync(delayMs = 15_000) {
   timer = window.setTimeout(() => void runSync(), delayMs)
 }
 
+const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
+
+async function pushAttachments(convId: string) {
+  const atts = await db.attachments.where("convId").equals(convId).toArray()
+  for (const a of atts) {
+    if (a.syncedAt) continue
+    if (a.blob.size > MAX_ATTACHMENT_BYTES) continue // over the 8MB cap: stays local-only
+    const res = await fetch(`/api/sync/attachments/${a.id}`, {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "content-type": a.mime, "x-attachment-name": a.name },
+      body: a.blob,
+    })
+    if (res.ok) await db.attachments.update(a.id, { syncedAt: Date.now() })
+  }
+}
+
+async function pullAttachments(convId: string, messages: Message[]) {
+  const wanted = messages.flatMap((m) => m.attachmentIds ?? [])
+  for (const id of wanted) {
+    if (await db.attachments.get(id)) continue
+    const res = await fetch(`/api/sync/attachments/${id}`, { credentials: "same-origin" })
+    if (!res.ok) continue // not uploaded (e.g. over cap on the other device)
+    await db.attachments.put({
+      id,
+      convId,
+      name: res.headers.get("x-attachment-name") ?? "attachment",
+      mime: res.headers.get("content-type") ?? "application/octet-stream",
+      blob: await res.blob(),
+      createdAt: Date.now(),
+      syncedAt: Date.now(),
+    })
+  }
+}
+
 async function push(conv: Conversation) {
   const messages = await db.messages.where("convId").equals(conv.id).sortBy("seq")
   const res = await fetch(`/api/sync/chats/${conv.id}`, {
@@ -22,7 +57,11 @@ async function push(conv: Conversation) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ conversation: conv, messages }),
   })
-  if (res.status === 409) await pull(conv.id) // remote is newer — take it
+  if (res.status === 409) {
+    await pull(conv.id) // remote is newer — take it
+    return
+  }
+  if (res.ok) await pushAttachments(conv.id)
 }
 
 async function pull(id: string) {
@@ -46,6 +85,7 @@ async function pull(id: string) {
       await db.messages.where("convId").equals(id).delete()
       await db.messages.bulkPut(messages)
     })
+    await pullAttachments(id, messages)
   } finally {
     applying = false
   }

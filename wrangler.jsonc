@@ -19,6 +19,7 @@
       "migrations_dir": "migrations"
     }
   ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "chat-media" }],
   "vars": {
     "GITHUB_CLIENT_ID": "",
     "APP_BASE_URL": "https://chat.4x.rip"
