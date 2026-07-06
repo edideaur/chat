@@ -84,6 +84,10 @@ export async function latestArtifact(
   return undefined
 }
 
+export async function saveArtifactSnapshot(msgId: string, snap: ArtifactSnapshot) {
+  return saveSnapshot(msgId, snap)
+}
+
 async function saveSnapshot(msgId: string, snap: ArtifactSnapshot) {
   const msg = await db.messages.get(msgId)
   const rest = (msg?.artifacts ?? []).filter((a) => a.artifactId !== snap.artifactId)

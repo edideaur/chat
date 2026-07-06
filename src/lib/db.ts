@@ -37,7 +37,10 @@ export interface ToolCallRecord {
 export interface ArtifactSnapshot {
   artifactId: string
   title: string
+  /** Rendered preview document (for multi-file builds, the bundled output). */
   html: string
+  /** Source tree for the code browser (present for built multi-file artifacts). */
+  files?: { path: string; content: string }[]
 }
 
 export interface PendingQuestion {

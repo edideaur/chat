@@ -134,6 +134,7 @@ export async function gatherTools(opts: GatherOptions): Promise<GatheredTools> {
       if (!getPrefs().e2bKey) return `Error: "${name}" is unavailable — no E2B API key is configured.`
       const r = await executeE2bTool(name, args as Record<string, unknown>, {
         convId: opts.convId,
+        msgId: opts.msgId,
         pushImage: (url) => images.push(url),
       })
       if (r !== null) return r
