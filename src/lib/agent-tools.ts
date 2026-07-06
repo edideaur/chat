@@ -35,7 +35,7 @@ export const AGENT_TOOL_DEFS: ToolDef[] = [
     function: {
       name: "create_artifact",
       description:
-        "Create or completely rewrite a web app/site/visualization, rendered instantly for the user in a live preview panel beside the chat. Provide ONE complete, self-contained HTML document: inline <style> and <script>; external resources only via https CDN urls (e.g. https://cdn.tailwindcss.com, unpkg.com, cdn.jsdelivr.net). It runs in a sandboxed iframe with no network restrictions but no access to the parent page. Use this whenever the user asks for a UI, website, app, game, form, or interactive visualization. KEEP THE DOCUMENT COMPACT — your output token budget is limited, so start with a solid core version and extend it with edit_artifact calls rather than emitting one huge document. Reuse the same id to replace an artifact.",
+        "Create or completely rewrite a web app/site/visualization, rendered instantly for the user in a live preview panel beside the chat. Provide ONE complete, self-contained HTML document: inline <style> and <script>; external resources only via https CDN urls (e.g. https://cdn.tailwindcss.com, unpkg.com, cdn.jsdelivr.net). It runs in a sandboxed iframe with no network restrictions but no access to the parent page. The preview has no real page URL, so for any client-side routing use a hash/in-memory router (e.g. React Router's HashRouter or MemoryRouter), never BrowserRouter. Use this whenever the user asks for a UI, website, app, game, form, or interactive visualization. KEEP THE DOCUMENT COMPACT — your output token budget is limited, so start with a solid core version and extend it with edit_artifact calls rather than emitting one huge document. Reuse the same id to replace an artifact.",
       parameters: {
         type: "object",
         properties: {
@@ -86,6 +86,29 @@ export async function latestArtifact(
 
 export async function saveArtifactSnapshot(msgId: string, snap: ArtifactSnapshot) {
   return saveSnapshot(msgId, snap)
+}
+
+// Artifacts run in a sandboxed, opaque-origin iframe, so the document URL is
+// `about:srcdoc` — not a valid base for `new URL(x, location.href)`, which
+// React Router and many libs call on load and crash on. This shim makes such
+// calls fall back to a real base, and swallows history errors so client-side
+// routing degrades instead of throwing.
+const ARTIFACT_RUNTIME = `<script>(function(){try{
+var N=window.URL;
+function U(u,b){try{return arguments.length<2?new N(u):new N(u,b);}catch(e){try{return new N(u,'http://localhost/');}catch(e2){throw e;}}}
+U.prototype=N.prototype;
+Object.getOwnPropertyNames(N).forEach(function(k){try{U[k]=typeof N[k]==='function'?N[k].bind(N):N[k];}catch(e){}});
+window.URL=U;
+['pushState','replaceState'].forEach(function(m){var o=history[m];history[m]=function(){try{return o.apply(this,arguments);}catch(e){}};});
+}catch(e){}})();</script>`
+
+export function withArtifactRuntime(html: string): string {
+  if (html.includes("http://localhost/")) return html // already injected
+  const head = html.match(/<head[^>]*>/i)
+  if (head) return html.replace(head[0], head[0] + ARTIFACT_RUNTIME)
+  const htmlTag = html.match(/<html[^>]*>/i)
+  if (htmlTag) return html.replace(htmlTag[0], htmlTag[0] + ARTIFACT_RUNTIME)
+  return ARTIFACT_RUNTIME + html
 }
 
 async function saveSnapshot(msgId: string, snap: ArtifactSnapshot) {
@@ -144,7 +167,7 @@ export async function executeAgentTool(
     const snap: ArtifactSnapshot = {
       artifactId: String(args.id || "app"),
       title: String(args.title || "App"),
-      html,
+      html: withArtifactRuntime(html),
     }
     await saveSnapshot(ctx.msgId, snap)
     openArtifactPanel(ctx.convId, snap.artifactId)

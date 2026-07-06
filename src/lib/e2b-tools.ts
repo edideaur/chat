@@ -1,7 +1,7 @@
 // E2B-backed agent tools: sandboxed code execution and desktop computer use.
 // Screenshots can't ride in OpenAI-compat tool results (text only), so they go
 // through an image side channel that generation.ts injects as user messages.
-import { saveArtifactSnapshot } from "@/lib/agent-tools"
+import { saveArtifactSnapshot, withArtifactRuntime } from "@/lib/agent-tools"
 import { getCodeSandbox, getDesktop, type ComputerAction } from "@/lib/e2b"
 import type { ToolDef } from "@/lib/openai"
 import { openArtifactPanel, openComputerPanel } from "@/lib/panel"
@@ -62,7 +62,7 @@ export const CODE_TOOL_DEFS: ToolDef[] = [
     function: {
       name: "build_artifact",
       description:
-        "Build a real multi-file React/TypeScript app from files you wrote in the sandbox and show it in the live preview panel with a browsable source view. Workflow: (1) write a project into a directory with write_file — a package.json listing react, react-dom and any npm deps, and source files with an entry at src/main.tsx (or .jsx) that mounts to <div id=\"root\">; import CSS from the entry if you want styles. (2) Call build_artifact with that dir. It runs npm install and bundles with esbuild into one self-contained page (no CDN needed), then displays the app and its source to the user. Reuse the same id + dir to rebuild after edits (node_modules is cached). For a quick single-file page, prefer create_artifact instead.",
+        "Build a real multi-file React/TypeScript app from files you wrote in the sandbox and show it in the live preview panel with a browsable source view. Workflow: (1) write a project into a directory with write_file — a package.json listing react, react-dom and any npm deps, and source files with an entry at src/main.tsx (or .jsx) that mounts to <div id=\"root\">; import CSS from the entry if you want styles. The preview has no real page URL, so use HashRouter or MemoryRouter for routing, never BrowserRouter. (2) Call build_artifact with that dir. It runs npm install and bundles with esbuild into one self-contained page (no CDN needed), then displays the app and its source to the user. Reuse the same id + dir to rebuild after edits (node_modules is cached). For a quick single-file page, prefer create_artifact instead.",
       parameters: {
         type: "object",
         properties: {
@@ -217,9 +217,11 @@ echo "ENTRY_USED:$ENTRY"`
     // code browser just won't have the tree; preview still works
   }
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${
-    css ? `<style>${css}</style>` : ""
-  }</head><body><div id="root"></div><script>${js}</script></body></html>`
+  const html = withArtifactRuntime(
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${
+      css ? `<style>${css}</style>` : ""
+    }</head><body><div id="root"></div><script>${js}</script></body></html>`
+  )
 
   await saveArtifactSnapshot(msgId, { artifactId: args.id, title: args.title, html, files })
   openArtifactPanel(convId, args.id)
