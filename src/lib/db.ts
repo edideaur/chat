@@ -133,6 +133,13 @@ export async function deleteConversation(id: string) {
   })
 }
 
+/** Delete every conversation (tombstoning each when sync is on so it propagates). */
+export async function deleteAllConversations() {
+  const convs = await db.conversations.filter((c) => !c.deletedAt).toArray()
+  for (const c of convs) await deleteConversation(c.id)
+  return convs.length
+}
+
 export async function nextSeq(convId: string): Promise<number> {
   const last = await db.messages.where("[convId+seq]").between([convId, Dexie.minKey], [convId, Dexie.maxKey]).last()
   return (last?.seq ?? -1) + 1

@@ -1,6 +1,9 @@
 import { useState } from "react"
+import { useLiveQuery } from "dexie-react-hooks"
 import { Check, Loader2, LogIn, Pencil, Plug, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+
+import { db, deleteAllConversations } from "@/lib/db"
 
 import { useLogout, useMe } from "@/hooks/use-me"
 import { testEndpoint, type EndpointTestResult } from "@/lib/endpoint-test"
@@ -432,9 +435,70 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </div>
 
           <McpSection />
+
+          <DeleteAllChats />
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function DeleteAllChats() {
+  const count = useLiveQuery(() =>
+    db.conversations.filter((c) => !c.deletedAt).count()
+  )
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const run = async () => {
+    setBusy(true)
+    try {
+      const n = await deleteAllConversations()
+      toast.success(`Deleted ${n} chat${n === 1 ? "" : "s"}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete chats")
+    } finally {
+      setBusy(false)
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <div className="grid gap-1.5 border-t border-border pt-4">
+      <Label className="text-destructive">Danger zone</Label>
+      {confirming ? (
+        <div className="flex items-center gap-2">
+          <span className="flex-1 text-sm">
+            Delete all {count ?? ""} chats? This can't be undone.
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="destructive" size="sm" onClick={run} disabled={busy}>
+            {busy ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Trash2 data-icon="inline-start" />}
+            Delete all
+          </Button>
+        </div>
+      ) : (
+        <>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="justify-start"
+            disabled={!count}
+            onClick={() => setConfirming(true)}
+          >
+            <Trash2 data-icon="inline-start" />
+            Delete all chats
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Removes every conversation on this device{" "}
+            {count ? `(${count})` : ""}. With sync on, they're removed from your
+            other devices too.
+          </p>
+        </>
+      )}
+    </div>
   )
 }
 

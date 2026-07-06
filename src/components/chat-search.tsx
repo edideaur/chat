@@ -32,12 +32,17 @@ export function ChatSearch({ open, onOpenChange }: ChatSearchProps) {
   const hits = useLiveQuery(async () => {
     const q = query.trim().toLowerCase()
     if (!q) {
-      const recent = await db.conversations.orderBy("updatedAt").reverse().limit(10).toArray()
+      const recent = await db.conversations
+        .orderBy("updatedAt")
+        .reverse()
+        .filter((c) => !c.deletedAt)
+        .limit(10)
+        .toArray()
       return recent.map<Hit>((c) => ({ convId: c.id, title: c.title }))
     }
     const byId = new Map<string, Hit>()
     const convs = await db.conversations
-      .filter((c) => c.title.toLowerCase().includes(q))
+      .filter((c) => !c.deletedAt && c.title.toLowerCase().includes(q))
       .limit(10)
       .toArray()
     for (const c of convs) byId.set(c.id, { convId: c.id, title: c.title })
@@ -49,7 +54,7 @@ export function ChatSearch({ open, onOpenChange }: ChatSearchProps) {
     for (const m of msgs) {
       if (byId.has(m.convId)) continue
       const conv = await db.conversations.get(m.convId)
-      if (!conv) continue
+      if (!conv || conv.deletedAt) continue
       const at = m.content.toLowerCase().indexOf(q)
       const snippet = `${at > 20 ? "…" : ""}${m.content.slice(Math.max(0, at - 20), at + 60)}`
       byId.set(m.convId, { convId: m.convId, title: conv.title, snippet })

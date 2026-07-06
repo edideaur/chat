@@ -115,13 +115,15 @@ export async function runSync(): Promise<void> {
     for (const conv of local) {
       const r = remote.get(conv.id)
       if (conv.deletedAt) {
+        let confirmed = true
         if (r && !r.deleted) {
-          await fetch(`/api/sync/chats/${conv.id}`, {
+          const res = await fetch(`/api/sync/chats/${conv.id}`, {
             method: "DELETE",
             credentials: "same-origin",
           })
+          confirmed = res.ok // keep the tombstone to retry if the server didn't take it
         }
-        await db.conversations.delete(conv.id) // purge the local tombstone
+        if (confirmed) await db.conversations.delete(conv.id)
         continue
       }
       if (!r || conv.updatedAt > r.updatedAt) await push(conv)
@@ -152,7 +154,7 @@ export async function runSync(): Promise<void> {
   }
 }
 
-/** Call once on boot: mutation hooks + focus trigger + initial run. */
+/** Call once on boot: mutation hooks + focus/poll triggers + initial run. */
 export function initSync() {
   for (const table of [db.conversations, db.messages]) {
     table.hook("creating", () => scheduleSync())
@@ -160,5 +162,13 @@ export function initSync() {
     table.hook("deleting", () => scheduleSync())
   }
   window.addEventListener("focus", () => scheduleSync(500))
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") scheduleSync(500)
+  })
+  // Poll while the tab is visible so remote changes (new chats, deletions from
+  // other devices) arrive without needing a focus event or a local edit.
+  window.setInterval(() => {
+    if (document.visibilityState === "visible") void runSync()
+  }, 30_000)
   scheduleSync(1000)
 }

@@ -42,7 +42,11 @@ export function AppSidebar({
   const [renameValue, setRenameValue] = useState("")
 
   const conversations = useLiveQuery(() =>
-    db.conversations.orderBy("updatedAt").reverse().toArray()
+    db.conversations
+      .orderBy("updatedAt")
+      .reverse()
+      .filter((c) => !c.deletedAt)
+      .toArray()
   )
   const streamingConvIds = useLiveQuery(async () => {
     const rows = await db.messages.where("status").equals("streaming").toArray()
