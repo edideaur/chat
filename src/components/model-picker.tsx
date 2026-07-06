@@ -117,7 +117,9 @@ export function ModelPicker({ profile }: { profile?: Profile }) {
                   key={id}
                   value={`${id} ${m?.name ?? ""}`}
                   onSelect={() => toggle(id, false)}
-                  className="gap-2"
+                  // hide CommandItem's built-in trailing check so the compare
+                  // circle sits flush right instead of being pushed off the edge
+                  className="gap-2 [&>svg:last-child]:hidden"
                 >
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm">
