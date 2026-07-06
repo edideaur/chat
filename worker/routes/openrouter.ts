@@ -6,7 +6,7 @@ interface OpenRouterModel {
   name?: string
   context_length?: number
   pricing?: { prompt?: string; completion?: string }
-  architecture?: { modality?: string }
+  architecture?: { modality?: string; input_modalities?: string[] }
   supported_parameters?: string[]
 }
 
@@ -30,6 +30,9 @@ openrouter.get("/models", async (c) => {
     pricing: { prompt: m.pricing?.prompt, completion: m.pricing?.completion },
     modality: m.architecture?.modality,
     supportsTools: m.supported_parameters?.includes("tools") ?? undefined,
+    supportsVision:
+      m.architecture?.input_modalities?.includes("image") ??
+      (m.architecture?.modality ? m.architecture.modality.split("->")[0].includes("image") : undefined),
   }))
 
   const res = new Response(JSON.stringify({ data: slim }), {

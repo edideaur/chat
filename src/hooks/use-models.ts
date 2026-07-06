@@ -9,6 +9,7 @@ export interface ModelMeta {
   pricing?: { prompt?: string; completion?: string }
   modality?: string
   supportsTools?: boolean
+  supportsVision?: boolean
 }
 
 // Module-level cache so non-React code (generation.ts) can consult metadata too.

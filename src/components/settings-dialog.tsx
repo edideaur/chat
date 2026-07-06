@@ -415,6 +415,22 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </p>
           </div>
 
+          <div className="grid gap-1.5">
+            <Label htmlFor="e2b-key">E2B API key (code execution & computer use)</Label>
+            <Input
+              id="e2b-key"
+              type="password"
+              value={prefs.e2bKey ?? ""}
+              onChange={(e) => setPrefs({ e2bKey: e.target.value || undefined })}
+              placeholder="e2b_…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Lets tool-capable models run code in cloud sandboxes and drive a
+              virtual desktop you can watch live. Get a key at e2b.dev — usage is
+              billed by E2B. Stored in this browser only, sent directly to E2B.
+            </p>
+          </div>
+
           <McpSection />
         </div>
       </DialogContent>

@@ -10,6 +10,7 @@ import {
   type Message,
 } from "@/lib/db"
 import { fetchOpenRouterMeta, lookupMeta } from "@/hooks/use-models"
+import { killConversationSandboxes } from "@/lib/e2b"
 import { exaSearch, searchContextBlock } from "@/lib/exa"
 import {
   ApiError,
@@ -80,6 +81,8 @@ export async function stopConversation(convId: string) {
     .filter((m) => m.convId === convId)
     .toArray()
   for (const m of streaming) stopGeneration(m.id)
+  // Stop means stop paying: tear down any E2B sandboxes too.
+  void killConversationSandboxes(convId)
 }
 
 function resolveTarget(conv: Conversation | undefined): {
@@ -265,8 +268,18 @@ export async function startAssistant(
       )
       const toolsAllowed = meta?.supportsTools !== false
       const gathered = toolsAllowed
-        ? await gatherTools({ webSearch: !!opts.webSearch, convId, msgId: msg.id })
-        : { defs: [], execute: async () => "", sources: [] as NonNullable<Message["searchResults"]> }
+        ? await gatherTools({
+            webSearch: !!opts.webSearch,
+            convId,
+            msgId: msg.id,
+            vision: meta?.supportsVision,
+          })
+        : {
+            defs: [],
+            execute: async () => "",
+            sources: [] as NonNullable<Message["searchResults"]>,
+            drainImages: () => [] as string[],
+          }
 
       // Metadata says no tools but search was requested → classic inject mode.
       if (!toolsAllowed && opts.webSearch) {
@@ -280,6 +293,26 @@ export async function startAssistant(
 
       const transcript: ChatMessage[] = [...context]
       let tools = gathered.defs
+      // Screenshots injected as user messages (tool results are text-only on
+      // OpenAI-compat APIs). Keep only the newest few to cap token burn.
+      const MAX_LIVE_SCREENSHOTS = 3
+      const screenshotIdx: number[] = []
+      const injectImages = () => {
+        for (const url of gathered.drainImages()) {
+          screenshotIdx.push(transcript.length)
+          transcript.push({
+            role: "user",
+            content: [
+              { type: "text", text: "[image output / screenshot after the last tool call]" },
+              { type: "image_url", image_url: { url } },
+            ],
+          })
+          if (screenshotIdx.length > MAX_LIVE_SCREENSHOTS) {
+            const old = screenshotIdx.shift()!
+            transcript[old] = { role: "user", content: "[older screenshot removed]" }
+          }
+        }
+      }
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         roundBuf = ""
@@ -375,6 +408,7 @@ export async function startAssistant(
           transcript.push({ role: "tool", tool_call_id: tc.id, content: output })
           await db.messages.update(msg.id, { toolCalls: [...journal] })
         }
+        injectImages()
       }
 
       window.clearTimeout(timer)

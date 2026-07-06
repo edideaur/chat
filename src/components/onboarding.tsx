@@ -38,6 +38,7 @@ export function Onboarding() {
 
   // extras drafts
   const [exaKey, setExaKey] = useState("")
+  const [e2bKey, setE2bKey] = useState("")
   const [mcp, setMcp] = useState({ name: "", url: "" })
   const [systemPrompt, setSystemPrompt] = useState("")
 
@@ -71,6 +72,7 @@ export function Onboarding() {
 
   const saveExtras = () => {
     if (exaKey.trim()) setPrefs({ exaKey: exaKey.trim() })
+    if (e2bKey.trim()) setPrefs({ e2bKey: e2bKey.trim() })
     if (mcp.name.trim() && /^https?:\/\//.test(mcp.url.trim())) {
       setPrefs({
         mcpServers: [
@@ -288,6 +290,20 @@ export function Onboarding() {
               <p className="text-xs text-muted-foreground">
                 Enables the web-search toggle on the composer, with cited sources. Get a key at
                 exa.ai — stored in this browser only.
+              </p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="ob-e2b">E2B API key (code & computer use)</Label>
+              <Input
+                id="ob-e2b"
+                type="password"
+                value={e2bKey}
+                onChange={(e) => setE2bKey(e.target.value)}
+                placeholder="e2b_…"
+              />
+              <p className="text-xs text-muted-foreground">
+                Models can run code in cloud sandboxes and drive a virtual desktop
+                you watch live. Get a key at e2b.dev — usage billed by E2B.
               </p>
             </div>
             <div className="grid gap-1.5">

@@ -16,6 +16,7 @@ export interface Prefs {
   selectedModels?: string[]
   globalSystemPrompt?: string
   exaKey?: string
+  e2bKey?: string
   mcpServers?: McpServerConfig[]
   syncEnabled?: boolean
   lastSyncAt?: number
