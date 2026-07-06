@@ -11,11 +11,16 @@ import "./index.css"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { runJanitor } from "@/lib/db"
+import { killAllSandboxes } from "@/lib/e2b"
 import { initSync } from "@/lib/sync"
 import { router } from "@/router"
 
 void runJanitor()
 initSync()
+
+// Best-effort: tear down E2B sandboxes if the tab closes mid-session (E2B's
+// server-side timeout is the real backstop).
+window.addEventListener("pagehide", () => void killAllSandboxes())
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },

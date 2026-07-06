@@ -13,6 +13,7 @@ Your endpoints, API keys, and chats live in your browser. The server is only inv
 - **Attachments** — images sent as multimodal content parts; text files inlined into the prompt.
 - **Web search** via [Exa](https://exa.ai) using your own Exa key, with cited sources under the response. Models that support tool calling get it as a `web_search` tool and decide when to search; other models get results injected up front.
 - **Artifacts** — tool-capable models can build small websites and apps right in the chat: `create_artifact` / `edit_artifact` render a live preview in a sandboxed side panel (no access to your keys), with reload, open-in-tab, and download. An `ask_user` tool lets the model pause mid-generation and ask clarifying questions with one-click options. Agentic chains run up to 12 tool rounds (think → ask → build → edit → answer).
+- **E2B sandboxes** — add an [E2B](https://e2b.dev) key to give tool-capable models two more powers: **code execution** (`run_code` / `run_command` / file tools) in a persistent cloud sandbox — real Python, installs, chart outputs — for computing and testing before shipping an artifact; and **computer use** (`computer_start` / `computer_action`) — a virtual Linux desktop the model drives while you watch the live stream in the side panel, with a Stop-sandbox button. Computer tools require a vision-capable model. Sandboxes are torn down on stop, tab close, or E2B's own timeout.
 - **MCP servers** — connect remote [Model Context Protocol](https://modelcontextprotocol.io) servers (Streamable HTTP transport, CORS required); their tools are offered to tool-capable models automatically. Servers that require OAuth are supported end-to-end in the browser: metadata discovery, dynamic client registration, PKCE popup flow, and silent token refresh — tokens stay local like every other key.
 - **Chat ergonomics** — edit + resend, regenerate with version history, rename/delete, `⌘K` search across chats, `⌘⇧O` new chat.
 - **System prompts & sampling** — a global default system prompt plus per-conversation overrides for prompt, temperature, max tokens, model, and endpoint.
@@ -24,6 +25,7 @@ Your endpoints, API keys, and chats live in your browser. The server is only inv
 - Endpoint profiles and API keys are stored in `localStorage` only. They are never sent to this app's server, never synced, never logged.
 - Model API calls go directly from your browser to the endpoint you configured.
 - The Exa key transits our worker per-request (Exa's API blocks direct browser calls) but is not stored or logged server-side.
+- The E2B key goes directly from your browser to E2B (their API allows it); sandbox usage is billed to your E2B account.
 - GitHub login is identity-only: the OAuth token is revoked immediately after fetching your profile.
 
 ## Architecture

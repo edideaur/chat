@@ -165,6 +165,10 @@ export function hasDesktop(convId: string): boolean {
   return desktops.has(convId)
 }
 
+export async function killAllSandboxes(): Promise<void> {
+  await Promise.all([...codeSandboxes.keys(), ...desktops.keys()].map(killConversationSandboxes))
+}
+
 export async function killConversationSandboxes(convId: string): Promise<void> {
   const code = codeSandboxes.get(convId)
   const desk = desktops.get(convId)
