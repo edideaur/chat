@@ -41,6 +41,7 @@ export const PRESETS: Preset[] = [
   { name: "Groq", baseUrl: "https://api.groq.com/openai/v1" },
   { name: "Together", baseUrl: "https://api.together.xyz/v1" },
   { name: "Mistral", baseUrl: "https://api.mistral.ai/v1" },
+  { name: "NavyAI", baseUrl: "https://api.navy/v1" },
   {
     name: "OpenCode Zen",
     baseUrl: "/api/opencode/go/v1",
