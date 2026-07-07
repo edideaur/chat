@@ -42,6 +42,11 @@ export const PRESETS: Preset[] = [
   { name: "Together", baseUrl: "https://api.together.xyz/v1" },
   { name: "Mistral", baseUrl: "https://api.mistral.ai/v1" },
   {
+    name: "OpenCode Zen",
+    baseUrl: "/api/opencode/go/v1",
+    hint: "OpenCode blocks direct browser calls, so this routes through this app's server. Your key and messages transit the proxy per request — never stored or logged.",
+  },
+  {
     name: "Ollama",
     baseUrl: "http://localhost:11434/v1",
     hint: "Start Ollama with OLLAMA_ORIGINS set to this site's origin so the browser can reach it.",

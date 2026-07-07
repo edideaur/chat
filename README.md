@@ -6,7 +6,7 @@ Your endpoints, API keys, and chats live in your browser. The server is only inv
 
 ## Features
 
-- **Any OpenAI-compatible endpoint** — presets for OpenRouter, OpenAI, Anthropic, Groq, Together, Mistral, Ollama, and LM Studio, plus multiple saved endpoint profiles (name, base URL, key, default model).
+- **Any OpenAI-compatible endpoint** — presets for OpenRouter, OpenAI, Anthropic, Google, Groq, Together, Mistral, OpenCode Zen, Ollama, and LM Studio, plus multiple saved endpoint profiles (name, base URL, key, default model). Most are called browser-direct; OpenCode Zen has no CORS headers so it routes through the worker (key transits per request, never stored or logged — flagged in the UI).
 - **Streaming** responses over SSE with a stop button, plus a graceful fallback for servers that don't stream.
 - **Markdown** rendering with syntax-highlighted code blocks (copy button), GFM tables, and KaTeX math.
 - **Multi-model compare** — pick 2+ models, watch them stream side by side, then promote one response to continue the thread.

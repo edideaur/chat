@@ -4,6 +4,7 @@ import { getSessionUserId } from "./lib/cookies"
 import { getUserById } from "./lib/db"
 import auth from "./routes/auth"
 import exa from "./routes/exa"
+import opencode from "./routes/opencode"
 import openrouter from "./routes/openrouter"
 import sync from "./routes/sync"
 
@@ -12,6 +13,7 @@ const app = new Hono<AppEnv>()
 app.route("/api/auth", auth)
 app.route("/api/openrouter", openrouter)
 app.route("/api/exa", exa)
+app.route("/api/opencode", opencode)
 app.route("/api/sync", sync)
 
 app.get("/api/me", async (c) => {
