@@ -6,6 +6,7 @@ import { Markdown } from "@/components/markdown"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { latestArtifact } from "@/lib/agent-tools"
+import { IS_NATIVE } from "@/lib/api-base"
 import type { ArtifactSnapshot } from "@/lib/db"
 import { killConversationSandboxes } from "@/lib/e2b"
 import { closeArtifactPanel, useArtifactPanel } from "@/lib/panel"
@@ -125,13 +126,20 @@ export function ArtifactPanel({ convId }: { convId: string }) {
 
   if (!artifact) return null
 
+  const shareNative = () =>
+    void import("@/lib/native").then((m) =>
+      m.shareFile(`${artifact.artifactId}.html`, artifact.html)
+    )
+
   const openInTab = () => {
+    if (IS_NATIVE) return shareNative()
     const url = URL.createObjectURL(new Blob([artifact.html], { type: "text/html" }))
     window.open(url, "_blank")
     setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }
 
   const download = () => {
+    if (IS_NATIVE) return shareNative()
     const url = URL.createObjectURL(new Blob([artifact.html], { type: "text/html" }))
     const a = document.createElement("a")
     a.href = url

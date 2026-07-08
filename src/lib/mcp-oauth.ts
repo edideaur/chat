@@ -2,6 +2,7 @@
 // protected-resource metadata → auth-server metadata → dynamic client
 // registration → PKCE authorization-code flow in a popup → token refresh.
 // Tokens live in localStorage with the rest of the user's keys.
+import { API_BASE, IS_NATIVE } from "@/lib/api-base"
 import { getPrefs, setPrefs } from "@/lib/profiles"
 import type { McpServerConfig } from "@/lib/mcp"
 
@@ -47,7 +48,9 @@ async function pkce(): Promise<{ verifier: string; challenge: string }> {
 }
 
 function callbackUrl(): string {
-  return `${location.origin}/oauth/callback`
+  // Native: the WebView origin isn't a valid redirect URI, so the flow lands
+  // on the website's callback page, which deep-links back into the app.
+  return `${API_BASE || location.origin}/oauth/callback`
 }
 
 async function fetchJson(url: string): Promise<Record<string, unknown> | null> {
@@ -202,14 +205,21 @@ export async function authorizeMcpServer(
   wwwAuthenticate?: string | null
 ): Promise<void> {
   // Open synchronously so popup blockers see the user gesture; navigate later.
-  const popup = window.open("about:blank", "mcp-oauth", "width=600,height=750,popup")
-  if (!popup) throw new Error("Popup blocked — allow popups for this site to connect.")
+  // Native has no popups: the flow runs in an in-app browser tab instead.
+  const popup = IS_NATIVE
+    ? null
+    : window.open("about:blank", "mcp-oauth", "width=600,height=750,popup")
+  if (!IS_NATIVE && !popup) {
+    throw new Error("Popup blocked — allow popups for this site to connect.")
+  }
   try {
     const cfg = freshConfig(cfgIn.id) ?? cfgIn
     const { as, scope, resource } = await discover(cfg, wwwAuthenticate)
     const client = await ensureClient(cfg, as)
     const { verifier, challenge } = await pkce()
-    const state = b64url(crypto.getRandomValues(new Uint8Array(16)))
+    // ".n" marks native so the callback page relays via deep link ("." is not
+    // in the base64url alphabet).
+    const state = b64url(crypto.getRandomValues(new Uint8Array(16))) + (IS_NATIVE ? ".n" : "")
 
     const url = new URL(as.authorization_endpoint)
     url.searchParams.set("response_type", "code")
@@ -220,9 +230,27 @@ export async function authorizeMcpServer(
     url.searchParams.set("state", state)
     url.searchParams.set("resource", resource)
     if (scope) url.searchParams.set("scope", scope)
-    popup.location.href = url.toString()
 
-    const code = await waitForCallback(state, popup)
+    let code: string
+    if (popup) {
+      popup.location.href = url.toString()
+      code = await waitForCallback(state, popup)
+    } else {
+      const [{ waitForMcpCallback }, { Browser }] = await Promise.all([
+        import("@/lib/native"),
+        import("@capacitor/browser"),
+      ])
+      await Browser.open({ url: url.toString() })
+      const params = await waitForMcpCallback()
+      if (params.get("state") !== state) throw new Error("Authorization failed (state mismatch).")
+      const returned = params.get("code")
+      if (!returned) {
+        throw new Error(
+          params.get("error_description") ?? params.get("error") ?? "Authorization failed."
+        )
+      }
+      code = returned
+    }
     const tokens = await tokenRequest(
       as.token_endpoint,
       {
@@ -239,7 +267,7 @@ export async function authorizeMcpServer(
       oauth: { ...client, tokenEndpoint: as.token_endpoint, resource, tokens },
     })
   } finally {
-    if (!popup.closed) popup.close()
+    if (popup && !popup.closed) popup.close()
   }
 }
 

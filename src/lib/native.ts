@@ -33,6 +33,21 @@ export function nativeLogin() {
   void Browser.open({ url: `${API_BASE}/api/auth/login?mobile=1` })
 }
 
+/** Blob URLs can't open or download inside a WebView — write to cache and share instead. */
+export async function shareFile(name: string, data: string) {
+  const [{ Filesystem, Directory, Encoding }, { Share }] = await Promise.all([
+    import("@capacitor/filesystem"),
+    import("@capacitor/share"),
+  ])
+  const { uri } = await Filesystem.writeFile({
+    path: name,
+    data,
+    directory: Directory.Cache,
+    encoding: Encoding.UTF8,
+  })
+  await Share.share({ files: [uri] })
+}
+
 /** Await the next chat4x://mcp-oauth deep link (MCP OAuth callback relay). */
 export function waitForMcpCallback(timeoutMs = 300_000): Promise<URLSearchParams> {
   return new Promise((resolve, reject) => {

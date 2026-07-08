@@ -6,6 +6,13 @@ export function OAuthCallback() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
+    // A ".n"-suffixed state means the native app started this flow in an
+    // in-app browser tab: relay the code back via deep link instead.
+    if (params.get("state")?.endsWith(".n")) {
+      setMessage("Returning to the app…")
+      location.href = `chat4x://mcp-oauth?${params.toString()}`
+      return
+    }
     const bc = new BroadcastChannel("mcp-oauth")
     bc.postMessage({
       state: params.get("state"),
