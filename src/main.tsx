@@ -18,6 +18,9 @@ import { router } from "@/router"
 void runJanitor()
 initSync()
 
+// Ask the browser/WebView not to evict IndexedDB under storage pressure.
+void navigator.storage?.persist?.()
+
 // Best-effort: tear down E2B sandboxes if the tab closes mid-session (E2B's
 // server-side timeout is the real backstop).
 window.addEventListener("pagehide", () => void killAllSandboxes())
