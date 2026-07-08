@@ -22,6 +22,7 @@ Core promise, do not break it: **API keys and chats never leave the browser.** K
 
 - **Conventional Commits**, lowercase, imperative (`feat:`, `fix:`, `chore:`, `style:`, `docs:`, `refactor:`).
 - **Never add a `Co-Authored-By` trailer or any Claude/Anthropic attribution to commits.** History was rewritten once to strip these — keep it out.
+- **Never push with a personal identity.** All public commits use the repo's pseudonymous author (see `git log origin/main`), enforced via repo-local `git config user.name`/`user.email` — don't override it, and never write real names or personal emails into commits, files, or docs. Before any push, verify outgoing authors: `git log origin/main..HEAD --format='%an <%ae>'`.
 - Commit each logical change separately; deploy after meaningful changes.
 
 ## Architecture map
