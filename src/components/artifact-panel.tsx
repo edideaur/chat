@@ -69,9 +69,9 @@ function Elapsed({ since }: { since: number }) {
 }
 
 const PANEL_CLASS =
-  "fixed inset-0 z-40 flex flex-col bg-background md:static md:z-auto md:w-[46%] md:min-w-96 md:border-l md:border-border"
+  "fixed inset-0 z-40 flex flex-col bg-background pb-[env(safe-area-inset-bottom)] md:static md:z-auto md:w-[46%] md:min-w-96 md:border-l md:border-border"
 const HEADER_CLASS =
-  "flex items-center gap-1 border-b border-border px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:pt-2"
+  "flex items-center gap-1 border-b border-border px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]"
 
 export function ArtifactPanel({ convId }: { convId: string }) {
   const panel = useArtifactPanel()

@@ -79,11 +79,11 @@ export function AppSidebar({
       )}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform md:static md:z-auto md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-sidebar-border bg-sidebar pl-[env(safe-area-inset-left)] text-sidebar-foreground transition-transform md:static md:z-auto md:translate-x-0 md:pl-0",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center px-4 pt-4 pb-2">
+        <div className="flex items-center px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2">
           <NavLink to="/" className="font-pixel text-lg tracking-tight text-primary">
             chat
           </NavLink>

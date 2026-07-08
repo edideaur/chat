@@ -94,7 +94,7 @@ export function Onboarding({ open, onClose }: { open: boolean; onClose: () => vo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background px-4 py-8">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:items-center">
       <div
         aria-hidden
         className="pointer-events-none fixed top-1/2 left-1/2 h-[420px] w-[min(92vw,50rem)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/15 blur-[110px]"
