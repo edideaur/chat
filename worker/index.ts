@@ -1,4 +1,5 @@
 import { Hono } from "hono"
+import { cors } from "hono/cors"
 import type { AppEnv } from "./types"
 import { getSessionUserId } from "./lib/cookies"
 import { getUserById } from "./lib/db"
@@ -9,6 +10,9 @@ import openrouter from "./routes/openrouter"
 import sync from "./routes/sync"
 
 const app = new Hono<AppEnv>()
+
+// Native app WebViews (Capacitor) call these APIs cross-origin with bearer auth.
+app.use("/api/*", cors({ origin: ["capacitor://localhost", "https://localhost"] }))
 
 app.route("/api/auth", auth)
 app.route("/api/openrouter", openrouter)

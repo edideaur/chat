@@ -22,12 +22,16 @@ export async function setSession(c: Context<AppEnv>, userId: number): Promise<vo
 }
 
 export async function getSessionUserId(c: Context<AppEnv>): Promise<number | null> {
-  const value = getCookie(c, SESSION_COOKIE)
+  // Native apps send the same encrypted payload as a bearer token instead of a cookie.
+  const header = c.req.header("authorization")
+  const bearer = header?.startsWith("Bearer ") ? header.slice(7) : undefined
+  const value = getCookie(c, SESSION_COOKIE) ?? bearer
   if (!value) return null
   const plain = await decryptToken(c.env.COOKIE_SECRET, value)
   if (!plain) return null
   try {
-    const parsed = JSON.parse(plain) as { uid?: number }
+    const parsed = JSON.parse(plain) as { uid?: number; exp?: number }
+    if (parsed.exp && parsed.exp < Date.now()) return null
     return typeof parsed.uid === "number" ? parsed.uid : null
   } catch {
     return null
