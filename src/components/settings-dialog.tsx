@@ -229,7 +229,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 overflow-y-auto overscroll-contain p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="flex flex-col gap-4 overflow-y-auto overscroll-contain p-4 max-sm:pb-[calc(max(1rem,env(safe-area-inset-bottom))+var(--kb,0px))]">
           {show("General") && (
             <div className="grid gap-1.5">
               <Label htmlFor="global-system">Default system prompt</Label>

@@ -6,8 +6,10 @@ const config: CapacitorConfig = {
   appName: "Chat",
   webDir: "dist/client",
   plugins: {
-    // Resize the WebView itself so h-svh layouts track the soft keyboard.
-    Keyboard: { resize: KeyboardResize.Native, resizeOnFullScreen: true },
+    // iOS: don't resize the WebView — native.ts animates a --kb padding var
+    // from keyboardWillShow so the layout glides with the keyboard instead of
+    // snapping. Android resizes via windowSoftInputMode=adjustResize.
+    Keyboard: { resize: KeyboardResize.None, resizeOnFullScreen: true },
   },
 }
 

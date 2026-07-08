@@ -3,6 +3,7 @@
 // the @capacitor chunks.
 import { App } from "@capacitor/app"
 import { Browser } from "@capacitor/browser"
+import { Capacitor } from "@capacitor/core"
 
 import { API_BASE, setAuthToken } from "@/lib/api-base"
 import { handleBack } from "@/lib/back-stack"
@@ -34,6 +35,23 @@ export function initNative(opts: { onAuthChanged: () => void }) {
     if (canGoBack) history.back()
     else void App.minimizeApp()
   })
+
+  // iOS keyboard glide: the WebView doesn't resize (Keyboard.resize = none);
+  // instead --kb drives an animated padding on keyboard-aware surfaces (see
+  // index.css). keyboardWillShow reports the final height before the keyboard
+  // animates, so the CSS transition runs alongside it. The synthetic resize
+  // events re-run stick-to-bottom logic mid- and post-glide.
+  if (Capacitor.getPlatform() === "ios") {
+    const setKb = (px: number) => {
+      document.documentElement.style.setProperty("--kb", `${px}px`)
+      window.dispatchEvent(new Event("resize"))
+      window.setTimeout(() => window.dispatchEvent(new Event("resize")), 280)
+    }
+    void import("@capacitor/keyboard").then(({ Keyboard }) => {
+      void Keyboard.addListener("keyboardWillShow", (i) => setKb(i.keyboardHeight))
+      void Keyboard.addListener("keyboardWillHide", () => setKb(0))
+    })
+  }
 }
 
 /** GitHub sign-in via the system browser tab; the worker deep-links the bearer token back. */

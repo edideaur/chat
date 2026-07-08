@@ -85,7 +85,7 @@ export function App() {
   }, [])
 
   return (
-    <div className="flex h-svh overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+    <div className="kb-pad flex h-svh overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       <AppSidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}

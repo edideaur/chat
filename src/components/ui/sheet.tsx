@@ -54,7 +54,7 @@ function SheetContent({
         data-slot="sheet-content"
         initialFocus={popupRef}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex max-h-[75svh] flex-col rounded-t-2xl bg-popover pb-[env(safe-area-inset-bottom)] text-sm text-popover-foreground ring-1 ring-foreground/10 duration-200 outline-none data-open:animate-in data-open:slide-in-from-bottom-[100%] data-closed:animate-out data-closed:slide-out-to-bottom-[100%]",
+          "kb-lift fixed inset-x-0 bottom-0 z-50 flex max-h-[75svh] flex-col rounded-t-2xl bg-popover pb-[env(safe-area-inset-bottom)] text-sm text-popover-foreground ring-1 ring-foreground/10 duration-200 outline-none data-open:animate-in data-open:slide-in-from-bottom-[100%] data-closed:animate-out data-closed:slide-out-to-bottom-[100%]",
           className
         )}
         {...props}
