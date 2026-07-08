@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
-import { Check, Loader2, LogIn, Pencil, Plug, Plus, Trash2 } from "lucide-react"
+import { Check, Loader2, LogIn, Pencil, Plug, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { IS_NATIVE } from "@/lib/api-base"
@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -178,16 +179,30 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>
-            Endpoints and keys are stored only in this browser — never sent to
-            this app's server, never synced.
-          </DialogDescription>
-        </DialogHeader>
+      {/* Full-screen page on phones, centered card on sm+. Header stays put;
+          only the body scrolls, so Close is always reachable. */}
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[85svh] flex-col gap-0 p-0 max-sm:top-0 max-sm:left-0 max-sm:h-svh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none sm:max-w-lg"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-border/70 p-4 max-sm:pt-[max(1rem,env(safe-area-inset-top))]">
+          <DialogHeader className="min-w-0">
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>
+              Endpoints and keys are stored only in this browser — never sent to
+              this app's server, never synced.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogClose
+            render={
+              <Button variant="ghost" size="icon-sm" aria-label="Close settings" />
+            }
+          >
+            <X />
+          </DialogClose>
+        </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 overflow-y-auto overscroll-contain p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="grid gap-1.5">
             <Label htmlFor="global-system">Default system prompt</Label>
             <Textarea
@@ -470,8 +485,8 @@ function DeleteAllChats() {
     <div className="grid gap-1.5 border-t border-border pt-4">
       <Label className="text-destructive">Danger zone</Label>
       {confirming ? (
-        <div className="flex items-center gap-2">
-          <span className="flex-1 text-sm">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="min-w-40 flex-1 text-sm">
             Delete all {count ?? ""} chats? This can't be undone.
           </span>
           <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={busy}>
