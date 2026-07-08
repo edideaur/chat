@@ -20,10 +20,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { answerQuestion } from "@/lib/agent-tools"
 import { db, type Message, type PendingQuestion } from "@/lib/db"
 import { editResend, regenerate } from "@/lib/generation"
@@ -38,7 +38,7 @@ function fmtDuration(ms: number): string {
   return `${m}m ${s}s`
 }
 
-/** Hover-for-detail generation stats under an assistant reply. */
+/** Generation stats under an assistant reply: hover on desktop, tap on touch. */
 function StatsBadge({ stats }: { stats: NonNullable<Message["stats"]> }) {
   const secs = stats.durationMs / 1000
   const tps =
@@ -46,8 +46,10 @@ function StatsBadge({ stats }: { stats: NonNullable<Message["stats"]> }) {
       ? (stats.completionTokens / secs).toFixed(1)
       : null
   return (
-    <Tooltip>
-      <TooltipTrigger
+    <Popover>
+      <PopoverTrigger
+        openOnHover
+        delay={150}
         render={
           <span className="cursor-default px-1 text-xs text-muted-foreground/70 tabular-nums">
             {fmtDuration(stats.durationMs)}
@@ -55,24 +57,24 @@ function StatsBadge({ stats }: { stats: NonNullable<Message["stats"]> }) {
           </span>
         }
       />
-      <TooltipContent className="flex-col items-start gap-0.5">
+      <PopoverContent className="w-auto gap-0.5 px-3 py-2 text-xs" side="top">
         <span>{fmtDuration(stats.durationMs)} to generate</span>
         {stats.completionTokens != null ? (
           <>
             <span>{stats.completionTokens.toLocaleString()} output tokens</span>
             {tps && <span>{tps} tokens/sec</span>}
             {stats.promptTokens != null && (
-              <span className="text-background/70">
+              <span className="text-muted-foreground">
                 {stats.promptTokens.toLocaleString()} prompt ·{" "}
                 {(stats.totalTokens ?? 0).toLocaleString()} total
               </span>
             )}
           </>
         ) : (
-          <span className="text-background/70">token usage not reported</span>
+          <span className="text-muted-foreground">token usage not reported</span>
         )}
-      </TooltipContent>
-    </Tooltip>
+      </PopoverContent>
+    </Popover>
   )
 }
 

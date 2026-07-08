@@ -140,7 +140,7 @@ export function Composer({ convId, className }: ComposerProps) {
                   </div>
                 )}
                 <button
-                  className="absolute top-0.5 right-0.5 cursor-pointer rounded-full bg-black/60 p-0.5 opacity-0 transition-opacity group-hover/att:opacity-100"
+                  className="absolute top-0.5 right-0.5 cursor-pointer rounded-full bg-black/60 p-0.5 opacity-0 transition-opacity group-hover/att:opacity-100 pointer-coarse:p-1 pointer-coarse:opacity-100"
                   onClick={() => removePending(i)}
                   aria-label={`Remove ${p.file.name}`}
                 >
