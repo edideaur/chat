@@ -12,7 +12,7 @@ import {
 import { fetchOpenRouterMeta, lookupMeta } from "@/hooks/use-models"
 import { killConversationSandboxes } from "@/lib/e2b"
 import { exaSearch, searchContextBlock } from "@/lib/exa"
-import { haptic, streamTick } from "@/lib/haptics"
+import { streamHapticsEnd, streamHapticsStart, streamTick } from "@/lib/haptics"
 import {
   ApiError,
   streamChatCompletion,
@@ -283,6 +283,16 @@ export async function startAssistant(
     }),
   })
 
+  // Haptic session spans the whole stream (incl. tool rounds); ended exactly
+  // once no matter which settle path runs.
+  streamHapticsStart()
+  let hapticsEnded = false
+  const endStreamHaptics = (completed: boolean) => {
+    if (hapticsEnded) return
+    hapticsEnded = true
+    streamHapticsEnd(completed)
+  }
+
   void (async () => {
     try {
       const meta = lookupMeta(
@@ -436,7 +446,7 @@ export async function startAssistant(
       }
 
       window.clearTimeout(timer)
-      haptic()
+      endStreamHaptics(true)
       await db.messages.update(msg.id, {
         ...patch(),
         status: "done",
@@ -445,6 +455,7 @@ export async function startAssistant(
       })
     } catch (err) {
       window.clearTimeout(timer)
+      endStreamHaptics(false)
       liveJournal = [] // drop never-executed streaming entries from the final state
       if (controller.signal.aborted) {
         await db.messages.update(msg.id, {

@@ -101,7 +101,7 @@ function AccountSection() {
             className="justify-center gap-2"
             {...(IS_NATIVE
               ? { onClick: () => void import("@/lib/native").then((m) => m.nativeLogin()) }
-              : { render: <a href="/api/auth/login" /> })}
+              : { render: <a href="/api/auth/login" />, nativeButton: false })}
           >
             <GithubIcon />
             Sign in with GitHub
