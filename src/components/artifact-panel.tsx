@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
 import { Code2, Download, ExternalLink, Eye, File, Monitor, Power, RotateCw, X } from "lucide-react"
 
@@ -80,6 +80,26 @@ export function ArtifactPanel({ convId }: { convId: string }) {
   const [view, setView] = useState<"preview" | "code">("preview")
   useBackClose(!!panel && panel.convId === convId, closeArtifactPanel)
 
+  // Swipe right on the header dismisses the full-screen panel on touch.
+  const swipe = useRef<{ x: number; y: number } | null>(null)
+  const headerTouch = {
+    onTouchStart: (e: React.TouchEvent) => {
+      swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    },
+    onTouchMove: (e: React.TouchEvent) => {
+      if (!swipe.current) return
+      const dx = e.touches[0].clientX - swipe.current.x
+      const dy = e.touches[0].clientY - swipe.current.y
+      if (dx > 60 && dx > 1.5 * Math.abs(dy)) {
+        swipe.current = null
+        closeArtifactPanel()
+      }
+    },
+    onTouchEnd: () => {
+      swipe.current = null
+    },
+  }
+
   const artifact = useLiveQuery(
     () =>
       panel?.kind === "artifact" && panel.convId === convId
@@ -93,7 +113,7 @@ export function ArtifactPanel({ convId }: { convId: string }) {
   if (panel.kind === "computer") {
     return (
       <aside className={PANEL_CLASS}>
-        <div className={HEADER_CLASS}>
+        <div className={HEADER_CLASS} {...headerTouch}>
           <Monitor className="size-4 shrink-0 text-primary" />
           <span className="min-w-0 flex-1 truncate text-sm font-medium">Computer</span>
           <span className="mr-1 flex items-center gap-1.5">
@@ -154,7 +174,7 @@ export function ArtifactPanel({ convId }: { convId: string }) {
 
   return (
     <aside className={PANEL_CLASS}>
-      <div className={HEADER_CLASS}>
+      <div className={HEADER_CLASS} {...headerTouch}>
         <span className="min-w-0 flex-1 truncate text-sm font-medium">
           {artifact.title}
         </span>

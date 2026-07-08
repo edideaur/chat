@@ -45,6 +45,42 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey)
   }, [navigate])
 
+  // Touch screens below md: swipe in from the left edge to open the drawer,
+  // swipe left anywhere (the drawer/backdrop own the screen) to close it.
+  useEffect(() => {
+    let start: { x: number; y: number; edge: boolean } | null = null
+    const onStart = (e: TouchEvent) => {
+      if (matchMedia("(min-width: 768px)").matches) return
+      const t = e.touches[0]
+      start = { x: t.clientX, y: t.clientY, edge: t.clientX < 24 }
+    }
+    const onMove = (e: TouchEvent) => {
+      if (!start) return
+      const { x, y, edge } = start
+      const t = e.touches[0]
+      const dx = t.clientX - x
+      const dy = t.clientY - y
+      if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return
+      start = null
+      setSidebarOpen((open) => {
+        if (!open && dx > 0 && edge) return true
+        if (open && dx < 0) return false
+        return open
+      })
+    }
+    const onEnd = () => {
+      start = null
+    }
+    document.addEventListener("touchstart", onStart, { passive: true })
+    document.addEventListener("touchmove", onMove, { passive: true })
+    document.addEventListener("touchend", onEnd, { passive: true })
+    return () => {
+      document.removeEventListener("touchstart", onStart)
+      document.removeEventListener("touchmove", onMove)
+      document.removeEventListener("touchend", onEnd)
+    }
+  }, [])
+
   return (
     <div className="flex h-svh overflow-hidden pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       <AppSidebar
