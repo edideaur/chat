@@ -16,6 +16,16 @@ export function MessageList({ messages }: { messages: Message[] }) {
     }
   }, [messages])
 
+  // Keep the latest message in view when the viewport shrinks (soft keyboard,
+  // orientation change) while stuck to the bottom.
+  useEffect(() => {
+    const onResize = () => {
+      if (stick.current) ref.current?.scrollTo({ top: ref.current.scrollHeight })
+    }
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+
   // Group assistant replies by the user message they answer.
   const items: Item[] = []
   const groups = new Map<string, Message[]>()
