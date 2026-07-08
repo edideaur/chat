@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
 import { Check, Loader2, LogIn, Pencil, Plug, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { runSync } from "@/lib/sync"
@@ -48,6 +49,10 @@ interface SettingsDialogProps {
 }
 
 const EMPTY_DRAFT = { name: "", baseUrl: "", apiKey: "", defaultModel: "" }
+
+// Phone layout shows one section at a time; desktop stacks them all.
+const SECTIONS = ["Endpoints", "Tools", "Account", "General"] as const
+type Section = (typeof SECTIONS)[number]
 
 function AccountSection() {
   const { data: me, isLoading } = useMe()
@@ -125,6 +130,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [test, setTest] = useState<
     { state: "idle" | "testing" } | { state: "done"; result: EndpointTestResult }
   >({ state: "idle" })
+  const isMobile = useMediaQuery("(max-width: 639px)")
+  const [section, setSection] = useState<Section>("Endpoints")
+  const show = (s: Section) => !isMobile || section === s
+  useEffect(() => {
+    if (open) setSection("Endpoints")
+  }, [open])
 
   const startEdit = (p: Profile) => {
     setDraft({
@@ -185,37 +196,57 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         showCloseButton={false}
         className="flex max-h-[85svh] flex-col gap-0 p-0 max-sm:top-0 max-sm:left-0 max-sm:h-svh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none sm:max-w-lg"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-border/70 p-4 max-sm:pt-[max(1rem,env(safe-area-inset-top))]">
-          <DialogHeader className="min-w-0">
-            <DialogTitle>Settings</DialogTitle>
-            <DialogDescription>
-              Endpoints and keys are stored only in this browser — never sent to
-              this app's server, never synced.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogClose
-            render={
-              <Button variant="ghost" size="icon-sm" aria-label="Close settings" />
-            }
-          >
-            <X />
-          </DialogClose>
+        <div className="flex flex-col gap-3 border-b border-border/70 p-4 max-sm:pt-[max(1rem,env(safe-area-inset-top))]">
+          <div className="flex items-start justify-between gap-3">
+            <DialogHeader className="min-w-0">
+              <DialogTitle>Settings</DialogTitle>
+              <DialogDescription>
+                Endpoints and keys are stored only in this browser — never sent to
+                this app's server, never synced.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogClose
+              render={
+                <Button variant="ghost" size="icon-sm" aria-label="Close settings" />
+              }
+            >
+              <X />
+            </DialogClose>
+          </div>
+          <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 sm:hidden">
+            {SECTIONS.map((s) => (
+              <Button
+                key={s}
+                variant={section === s ? "secondary" : "ghost"}
+                size="sm"
+                className="shrink-0 rounded-full"
+                aria-pressed={section === s}
+                onClick={() => setSection(s)}
+              >
+                {s}
+              </Button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-col gap-4 overflow-y-auto overscroll-contain p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="grid gap-1.5">
-            <Label htmlFor="global-system">Default system prompt</Label>
-            <Textarea
-              id="global-system"
-              value={prefs.globalSystemPrompt ?? ""}
-              onChange={(e) =>
-                setPrefs({ globalSystemPrompt: e.target.value || undefined })
-              }
-              placeholder="Applied to every new chat unless overridden per conversation."
-              className="min-h-20"
-            />
-          </div>
+          {show("General") && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="global-system">Default system prompt</Label>
+              <Textarea
+                id="global-system"
+                value={prefs.globalSystemPrompt ?? ""}
+                onChange={(e) =>
+                  setPrefs({ globalSystemPrompt: e.target.value || undefined })
+                }
+                placeholder="Applied to every new chat unless overridden per conversation."
+                className="min-h-20"
+              />
+            </div>
+          )}
 
+          {show("Endpoints") && (
+            <>
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium">Endpoints</h3>
             <Button variant="outline" size="sm" onClick={startNew}>
@@ -416,9 +447,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </div>
             </div>
           )}
+            </>
+          )}
 
-          <AccountSection />
+          {show("Account") && <AccountSection />}
 
+          {show("Tools") && (
+            <>
           <div className="grid gap-1.5">
             <Label htmlFor="exa-key">Exa API key (web search)</Label>
             <Input
@@ -453,8 +488,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           </div>
 
           <McpSection />
+            </>
+          )}
 
-          <DeleteAllChats />
+          {show("General") && <DeleteAllChats />}
         </div>
       </DialogContent>
     </Dialog>

@@ -8,6 +8,7 @@ import { Onboarding } from "@/components/onboarding"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { Button } from "@/components/ui/button"
 import { useBackClose } from "@/hooks/use-back-close"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import { usePrefs } from "@/lib/profiles"
 import { cn } from "@/lib/utils"
 
@@ -19,10 +20,12 @@ export function App() {
   const prefs = usePrefs()
   const navigate = useNavigate()
 
-  // First run: no endpoints yet. The settings icon opens the setup flow.
+  // First run: no endpoints yet. Desktop gets the setup wizard; phones go
+  // straight to Settings, which auto-opens the endpoint editor when empty.
+  const isMobile = useMediaQuery("(max-width: 767px)")
   const needsSetup = !prefs.onboardedAt && prefs.profiles.length === 0
   const openSettings = () =>
-    needsSetup ? setWizardOpen(true) : setSettingsOpen(true)
+    needsSetup && !isMobile ? setWizardOpen(true) : setSettingsOpen(true)
 
   useBackClose(sidebarOpen, () => setSidebarOpen(false))
   useBackClose(settingsOpen, () => setSettingsOpen(false))
