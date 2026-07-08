@@ -26,6 +26,15 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
 })
 
+// Literal env guard so web builds drop the native chunk entirely.
+if (import.meta.env.VITE_API_BASE) {
+  void import("@/lib/native").then(({ initNative }) =>
+    initNative({
+      onAuthChanged: () => void queryClient.invalidateQueries({ queryKey: ["me"] }),
+    })
+  )
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

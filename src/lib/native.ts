@@ -1,0 +1,48 @@
+// Native-only (Capacitor) glue. Never imported statically: main.tsx and the
+// login button load it behind an IS_NATIVE guard, so web bundles never fetch
+// the @capacitor chunks.
+import { App } from "@capacitor/app"
+import { Browser } from "@capacitor/browser"
+
+import { API_BASE, setAuthToken } from "@/lib/api-base"
+
+let onAuthChanged: (() => void) | undefined
+let deepLinkWaiter: ((params: URLSearchParams) => void) | undefined
+
+/** Called once at boot: routes chat4x:// deep links (OAuth callbacks) back into the app. */
+export function initNative(opts: { onAuthChanged: () => void }) {
+  onAuthChanged = opts.onAuthChanged
+  void App.addListener("appUrlOpen", ({ url }) => {
+    if (!url.startsWith("chat4x://")) return
+    void Browser.close().catch(() => {}) // dismiss the in-app browser tab
+    if (url.startsWith("chat4x://auth")) {
+      const token = /[#&]token=([^&]+)/.exec(url)?.[1]
+      if (token) {
+        setAuthToken(token)
+        onAuthChanged?.()
+      }
+    } else if (url.startsWith("chat4x://mcp-oauth")) {
+      deepLinkWaiter?.(new URLSearchParams(url.split("?")[1] ?? ""))
+      deepLinkWaiter = undefined
+    }
+  })
+}
+
+/** GitHub sign-in via the system browser tab; the worker deep-links the bearer token back. */
+export function nativeLogin() {
+  void Browser.open({ url: `${API_BASE}/api/auth/login?mobile=1` })
+}
+
+/** Await the next chat4x://mcp-oauth deep link (MCP OAuth callback relay). */
+export function waitForMcpCallback(timeoutMs = 300_000): Promise<URLSearchParams> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      deepLinkWaiter = undefined
+      reject(new Error("Authorization timed out."))
+    }, timeoutMs)
+    deepLinkWaiter = (params) => {
+      clearTimeout(timer)
+      resolve(params)
+    }
+  })
+}

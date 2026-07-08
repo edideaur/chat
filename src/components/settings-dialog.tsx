@@ -3,6 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks"
 import { Check, Loader2, LogIn, Pencil, Plug, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
+import { IS_NATIVE } from "@/lib/api-base"
 import { db, deleteAllConversations } from "@/lib/db"
 
 import { useLogout, useMe } from "@/hooks/use-me"
@@ -97,7 +98,9 @@ function AccountSection() {
           <Button
             variant="outline"
             className="justify-center gap-2"
-            render={<a href="/api/auth/login" />}
+            {...(IS_NATIVE
+              ? { onClick: () => void import("@/lib/native").then((m) => m.nativeLogin()) }
+              : { render: <a href="/api/auth/login" /> })}
           >
             <GithubIcon />
             Sign in with GitHub
